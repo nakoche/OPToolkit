@@ -4,7 +4,7 @@
 //
 //  コスト0〜10それぞれの枚数を「水が溜まっていく」ような棒グラフで表示する。
 //  枠は固定サイズで、中の水位（塗りつぶし高さ）だけが枚数に応じて変わる。
-//  12枚でMAX（それ以上は12として扱う）。
+//  10枚でMAX（それ以上は10として扱う）。
 //
 
 import SwiftUI
@@ -14,7 +14,7 @@ struct CostBarChart: View {
     let histogram: [Int: Int]
 
     private let costRange = 0...10
-    private let maxValue = 12
+    private let maxValue = 10
     private let barHeight: CGFloat = 120
     private let barWidth: CGFloat = 22
 
