@@ -47,6 +47,8 @@ enum CardRarity: String, CaseIterable, Identifiable, Codable {
     case secret = "SEC"
     case promo = "P"
     case leader = "L"
+    case sp = "SP"
+    case tr = "TR"
 
     var id: String { rawValue }
 }
@@ -64,7 +66,8 @@ enum CardBlockIcon: String, CaseIterable, Identifiable, Codable {
 }
 
 struct Card: Identifiable, Codable, Hashable {
-    let id: UUID
+    /// カード番号がそのまま一意なID（パラレル版は "OP01-001_p1" のように別番号になる）
+    var id: String { cardNumber }
     var name: String
     var cardNumber: String   // 例: "OP01-001"
     var color: CardColor
@@ -84,7 +87,6 @@ struct Card: Identifiable, Codable, Hashable {
     var isParallel: Bool          // パラレル版カードかどうか（リーダー選択画面のパラレル表示切替で使用）
 
     init(
-        id: UUID = UUID(),
         name: String,
         cardNumber: String,
         color: CardColor,
@@ -101,7 +103,6 @@ struct Card: Identifiable, Codable, Hashable {
         hasTrigger: Bool = false,
         isParallel: Bool = false
     ) {
-        self.id = id
         self.name = name
         self.cardNumber = cardNumber
         self.color = color
