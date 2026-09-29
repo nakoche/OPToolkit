@@ -9,6 +9,7 @@
 //
 
 import SwiftUI
+import Kingfisher
 
 struct CardDetailModal: View {
     let card: Card
@@ -16,6 +17,8 @@ struct CardDetailModal: View {
 
     /// ドラッグに追従させる画像のオフセット
     @State private var dragOffset: CGSize = .zero
+    /// 画像の取得に失敗したかどうか（失敗時はカード名入りのプレースホルダーを出す）
+    @State private var loadFailed = false
     /// これ以上ドラッグしたら閉じる、とみなす距離（pt）
     private let dismissThreshold: CGFloat = 120
 
@@ -67,27 +70,40 @@ struct CardDetailModal: View {
             }
     }
 
+    // カード画像は公式サイトのURLをKingfisher経由で取得する（CardImageCellと同じ方式）。
+    // グリッドで表示済みなら同じURLのキャッシュが使われるので、ほぼ即座に表示される。
     private var cardImage: some View {
         RoundedRectangle(cornerRadius: 12)
             .fill(.white.opacity(0.06))
             .aspectRatio(2.5 / 3.5, contentMode: .fit)
             .overlay {
-                // TODO: 実画像に差し替え（card.imageName）
-                if let imageName = card.imageName {
-                    Image(imageName)
+                if loadFailed {
+                    failurePlaceholder
+                } else {
+                    KFImage(card.imageURL)
+                        .placeholder {
+                            ProgressView()
+                                .tint(.white)
+                        }
+                        .onFailure { _ in
+                            loadFailed = true
+                        }
+                        .fade(duration: 0.15)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
-                } else {
-                    VStack(spacing: 8) {
-                        Image(systemName: "photo")
-                            .font(.system(size: 40))
-                        Text(card.name)
-                            .font(.caption)
-                    }
-                    .foregroundStyle(.white.opacity(0.6))
                 }
             }
+    }
+
+    private var failurePlaceholder: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "photo")
+                .font(.system(size: 40))
+            Text(card.name)
+                .font(.caption)
+        }
+        .foregroundStyle(.white.opacity(0.6))
     }
 
     private var closeButton: some View {

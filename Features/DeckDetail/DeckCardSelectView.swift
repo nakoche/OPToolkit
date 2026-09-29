@@ -15,6 +15,7 @@
 //
 
 import SwiftUI
+import Kingfisher
 
 struct DeckCardSelectView: View {
     @State var viewModel: DeckCardSelectViewModel
@@ -152,8 +153,7 @@ struct DeckCardSelectView: View {
             .aspectRatio(2.5 / 3.5, contentMode: .fit)
             .frame(width: 44)
             .overlay {
-                // TODO: 実画像に差し替え（entry.card.imageName）
-                Image(systemName: "photo")
+                KFImage(entry.card.imageURL)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

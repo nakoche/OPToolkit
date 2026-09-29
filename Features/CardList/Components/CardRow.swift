@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import Kingfisher
 
 struct CardRow: View {
     let card: Card
@@ -14,8 +15,7 @@ struct CardRow: View {
                 .fill(.secondary.opacity(0.2))
                 .frame(width: 44, height: 60)
                 .overlay {
-                    // TODO: 実画像に差し替え (card.imageName)
-                    Image(systemName: "photo")
+                    KFImage(card.imageURL)
                         .foregroundStyle(.secondary)
                 }
 

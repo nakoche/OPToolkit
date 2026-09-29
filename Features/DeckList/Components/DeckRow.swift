@@ -10,6 +10,7 @@
 //
 
 import SwiftUI
+import Kingfisher
 
 struct DeckRow: View {
     let deck: Deck
@@ -17,6 +18,9 @@ struct DeckRow: View {
     let onBattleHistory: () -> Void
     let onShowImage: () -> Void
     let onCopy: () -> Void
+
+    /// リーダー画像の取得に失敗したかどうか（失敗時はカード名ラベルのプレースホルダーを出す）
+    @State private var leaderLoadFailed = false
 
     private let rowHeight: CGFloat = 100
 
@@ -46,19 +50,33 @@ struct DeckRow: View {
         .onTapGesture(perform: onOpenDetail)
     }
 
+    // リーダー画像は公式サイトのURLをKingfisher経由で取得する（CardImageCellと同じ方式）。
     private var leaderThumbnail: some View {
         ZStack {
             Color(uiColor: .systemGray5)
             if let leader = deck.leaderCard {
-                // TODO: 実画像に差し替え（leader.imageName）
-                VStack {
-                    Spacer()
-                    Text(leader.name)
-                        .font(.system(size: 9))
-                        .foregroundStyle(.white)
-                        .padding(4)
-                        .frame(maxWidth: .infinity)
-                        .background(.black.opacity(0.5))
+                if leaderLoadFailed {
+                    // 取得失敗時だけカード名を出す
+                    VStack {
+                        Spacer()
+                        Text(leader.name)
+                            .font(.system(size: 9))
+                            .foregroundStyle(.white)
+                            .padding(4)
+                            .frame(maxWidth: .infinity)
+                            .background(.black.opacity(0.5))
+                    }
+                } else {
+                    KFImage(leader.imageURL)
+                        .placeholder {
+                            ProgressView()
+                        }
+                        .onFailure { _ in
+                            leaderLoadFailed = true
+                        }
+                        .fade(duration: 0.15)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
                 }
             } else {
                 Image(systemName: "questionmark")
