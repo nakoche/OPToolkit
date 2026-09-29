@@ -24,6 +24,7 @@ enum AppColorScheme: String, CaseIterable, Identifiable {
 
 /// カードリストの並び替えキー（Settings・CardListの両方から参照するのでここに置く）
 enum CardSortKey: String, CaseIterable, Identifiable {
+    case releaseOrder = "発売順"
     case name = "名前"
     case cost = "コスト"
     case power = "パワー"

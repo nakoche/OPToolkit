@@ -85,6 +85,8 @@ struct Card: Identifiable, Codable, Hashable {
     var hasBlocker: Bool          // ブロッカーを持つか（デッキ詳細の集計で使用）
     var hasTrigger: Bool          // トリガーを持つか（デッキ詳細の集計で使用）
     var isParallel: Bool          // パラレル版カードかどうか（リーダー選択画面のパラレル表示切替で使用）
+    var packCode: String?         // 実際に収録されている弾（例: "OP17"）。過去弾からの再録カードだと
+                                   // cardNumberの弾（例: "OP01"）と食い違う。nilならcardNumberの弾＝再録ではないとみなす
 
     init(
         name: String,
@@ -101,7 +103,8 @@ struct Card: Identifiable, Codable, Hashable {
         blockIcon: CardBlockIcon? = nil,
         hasBlocker: Bool = false,
         hasTrigger: Bool = false,
-        isParallel: Bool = false
+        isParallel: Bool = false,
+        packCode: String? = nil
     ) {
         self.name = name
         self.cardNumber = cardNumber
@@ -118,6 +121,7 @@ struct Card: Identifiable, Codable, Hashable {
         self.hasBlocker = hasBlocker
         self.hasTrigger = hasTrigger
         self.isParallel = isParallel
+        self.packCode = packCode
     }
 
     /// "／"区切りの特徴を個別のタグ配列にしたもの（デッキ詳細の特徴別集計で使用）

@@ -47,6 +47,23 @@ struct CardSearchSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
+                    section("特徴") {
+                        featureField
+                    }
+                    
+                    section("種別") {
+                        LazyVGrid(columns: gridColumns(4), spacing: 8) {
+                            ForEach(CardType.allCases) { type in
+                                FilterChip(
+                                    label: type.rawValue,
+                                    isSelected: criteria.selectedTypes.contains(type)
+                                ) {
+                                    toggle(type, in: &criteria.selectedTypes)
+                                }
+                            }
+                        }
+                    }
+
                     section("色") {
                         LazyVGrid(columns: gridColumns(6), spacing: 8) {
                             ForEach(CardColor.allCases) { color in
@@ -61,23 +78,6 @@ struct CardSearchSheet: View {
                                 .opacity(lockedColors != nil ? 0.7 : 1)
                             }
                         }
-                    }
-
-                    section("種別") {
-                        LazyVGrid(columns: gridColumns(4), spacing: 8) {
-                            ForEach(CardType.allCases) { type in
-                                FilterChip(
-                                    label: type.rawValue,
-                                    isSelected: criteria.selectedTypes.contains(type)
-                                ) {
-                                    toggle(type, in: &criteria.selectedTypes)
-                                }
-                            }
-                        }
-                    }
-
-                    section("特徴") {
-                        featureField
                     }
 
                     section("コスト") {

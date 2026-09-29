@@ -51,7 +51,7 @@ struct CardSearchCriteria: Equatable {
     var selectedCounters: Set<CounterOption> = []
     var selectedRarities: Set<CardRarity> = []
     var selectedBlockIcons: Set<CardBlockIcon> = []
-    var sortKey: CardSortKey = .name
+    var sortKey: CardSortKey = .releaseOrder   // デフォルトは発売順（最新弾→古い弾）
     var sortDirection: SortDirection = .ascending
 
     /// フィルタ・検索を適用したカード一覧を返す
@@ -117,14 +117,22 @@ struct CardSearchCriteria: Equatable {
             }
         }
 
-        result.sort { lhs, rhs in
-            let isAscending: Bool
-            switch sortKey {
-            case .name: isAscending = lhs.name < rhs.name
-            case .cost: isAscending = lhs.cost < rhs.cost
-            case .power: isAscending = (lhs.power ?? -1) < (rhs.power ?? -1)
+        switch sortKey {
+        case .releaseOrder:
+            // 発売順（最新弾→降順、弾内は番号昇順、再録は末尾、パラレルはノーマルの後）はロジックが
+            // 単純な1キー比較では表せないため、Card+ReleaseSort.swift の専用コンパレータに委譲する。
+            result = CardReleaseOrder.sorted(result, direction: sortDirection)
+        case .name, .cost, .power:
+            result.sort { lhs, rhs in
+                let isAscending: Bool
+                switch sortKey {
+                case .name: isAscending = lhs.name < rhs.name
+                case .cost: isAscending = lhs.cost < rhs.cost
+                case .power: isAscending = (lhs.power ?? -1) < (rhs.power ?? -1)
+                case .releaseOrder: isAscending = false // ここには来ない
+                }
+                return sortDirection == .ascending ? isAscending : !isAscending
             }
-            return sortDirection == .ascending ? isAscending : !isAscending
         }
 
         return result
