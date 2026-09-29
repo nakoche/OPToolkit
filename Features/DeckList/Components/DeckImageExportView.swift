@@ -9,6 +9,7 @@
 
 import SwiftUI
 import UIKit
+import Kingfisher
 
 struct DeckImageExportView: View {
     let deck: Deck
@@ -59,8 +60,7 @@ struct DeckImageExportView: View {
             .aspectRatio(2.5 / 3.5, contentMode: .fit)
             .frame(width: width)
             .overlay {
-                // TODO: 実画像に差し替え（card.imageName）
-                Text(card.name)
+                KFImage(card.imageURL)
                     .font(.system(size: 7))
                     .multilineTextAlignment(.center)
                     .padding(2)

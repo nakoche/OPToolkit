@@ -11,6 +11,7 @@
 //
 
 import SwiftUI
+import Kingfisher
 
 struct DeckDetailView: View {
     @State var viewModel: DeckDetailViewModel
@@ -173,8 +174,7 @@ struct DeckDetailView: View {
             .frame(width: width)
             .overlay {
                 if let card {
-                    // TODO: 実画像に差し替え（card.imageName）
-                    Text(card.name)
+                    KFImage(card.imageURL)
                         .font(.system(size: 8))
                         .multilineTextAlignment(.center)
                         .padding(2)

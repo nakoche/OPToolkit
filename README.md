@@ -178,7 +178,6 @@ RootView (TabView)
 
 ### TODOコメントが残っている箇所（コードから抽出）
 - `CardListViewModel.swift`: カード読み込み失敗時のエラー状態をViewに伝える仕組みが無い（現状は`print`のみ）。
-- `CardRow.swift` / `CardDetailModal.swift` / `CardQuantityModal.swift` / `DeckCardSelectView.swift` / `DeckDetailView.swift` / `DeckImageExportView.swift` / `DeckRow.swift`: いずれも`card.imageName`を使った実画像表示が未実装（プレースホルダーのまま）。**`CardImageCell.swift`のみ本セッションで`KFImage`＋`card.imageURL`に対応済み**。他のファイルも同じパターン（`ImageHost`経由で`card.imageURL`を`KFImage`に渡す）で置き換えれば動くはず。
 - `DeckStore.swift`: `FileManager`でのJSON永続化 or `SwiftData`への差し替えが必要（現状は`save`/`update`/`delete`/`reorder`いずれも「TODO: ディスクへの反映」でメモリ操作のみ）。
 - `CardSortKey`（`AppSettings.swift`）: `.releaseOrder`ケースが未追加。本セッションでは`CardSearchCriteria.swift`側に`.releaseOrder`を参照する処理を先に実装したが、`AppSettings.swift`自体は本セッションで共有されなかったため、ケースの追加がまだ反映されていない可能性が高い。**`CardSearchSheet`の並び替えPicker、`SettingsView`の「カードリストのデフォルト並び順」設定など、`CardSortKey.allCases`を参照している箇所全てで表示・動作を確認すること。**
 - `Tools/fetch_cards.py`: 実行結果（`cards.json`）を実機・Simulatorで最終確認できていない（本セッション内ではダミーHTMLでのロジック検証のみ）。特に2000枚以上を全件取得した際のパース漏れ・スキップ枚数を確認すること。

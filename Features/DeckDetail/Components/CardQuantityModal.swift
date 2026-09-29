@@ -8,6 +8,7 @@
 //
 
 import SwiftUI
+import Kingfisher
 
 struct CardQuantityModal: View {
     let card: Card
@@ -70,8 +71,7 @@ struct CardQuantityModal: View {
             .fill(.white.opacity(0.06))
             .aspectRatio(2.5 / 3.5, contentMode: .fit)
             .overlay {
-                // TODO: 実画像に差し替え（card.imageName）
-                Image(systemName: "photo")
+                KFImage(card.imageURL)
                     .font(.system(size: 32))
                     .foregroundStyle(.white.opacity(0.6))
             }
