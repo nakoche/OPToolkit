@@ -70,7 +70,8 @@ struct Card: Identifiable, Codable, Hashable {
     var id: String { cardNumber }
     var name: String
     var cardNumber: String   // 例: "OP01-001"
-    var color: CardColor
+    /// 色。2色のカードは2つ入る（常に1つ以上）
+    var colors: [CardColor]
     var type: CardType
     var cost: Int
     var power: Int?
@@ -78,7 +79,8 @@ struct Card: Identifiable, Codable, Hashable {
 
     // 検索・フィルタ用の追加情報
     var feature: String?          // 特徴（例: "超新星／麦わらの一味"のようなキーワードのまとまり。"／"区切りで複数持てる）
-    var attribute: CardAttribute? // イベント/ステージなど、属性を持たないカードはnil
+    /// 属性。2つ持つカードは2つ入る。イベント/ステージなど、属性を持たないカードは空
+    var attributes: [CardAttribute]
     var counter: Int?             // 1000 / 2000 / なし(nil)
     var rarity: CardRarity
     var blockIcon: CardBlockIcon? // 主にリーダーカードが持つ。持たない種別はnil
@@ -88,6 +90,50 @@ struct Card: Identifiable, Codable, Hashable {
     var packCode: String?         // 実際に収録されている弾（例: "OP17"）。過去弾からの再録カードだと
                                    // cardNumberの弾（例: "OP01"）と食い違う。nilならcardNumberの弾＝再録ではないとみなす
 
+    /// 先頭の色。色を1つだけ表示したい場面用。
+    /// 「この色を持つか」の判定には、2色目も見られるよう colors を使うこと。
+    var color: CardColor { colors[0] }
+    /// 先頭の属性（無ければnil）。「この属性を持つか」の判定には attributes を使うこと。
+    var attribute: CardAttribute? { attributes.first }
+
+    init(
+        name: String,
+        cardNumber: String,
+        colors: [CardColor],
+        type: CardType,
+        cost: Int,
+        power: Int? = nil,
+        imageName: String? = nil,
+        feature: String? = nil,
+        attributes: [CardAttribute] = [],
+        counter: Int? = nil,
+        rarity: CardRarity = .common,
+        blockIcon: CardBlockIcon? = nil,
+        hasBlocker: Bool = false,
+        hasTrigger: Bool = false,
+        isParallel: Bool = false,
+        packCode: String? = nil
+    ) {
+        precondition(!colors.isEmpty, "Cardのcolorsは1つ以上が必要です")
+        self.name = name
+        self.cardNumber = cardNumber
+        self.colors = colors
+        self.type = type
+        self.cost = cost
+        self.power = power
+        self.imageName = imageName
+        self.feature = feature
+        self.attributes = attributes
+        self.counter = counter
+        self.rarity = rarity
+        self.blockIcon = blockIcon
+        self.hasBlocker = hasBlocker
+        self.hasTrigger = hasTrigger
+        self.isParallel = isParallel
+        self.packCode = packCode
+    }
+
+    /// 1色・1属性のカードを作るための簡易イニシャライザ（サンプルデータ・プレビュー用）
     init(
         name: String,
         cardNumber: String,
@@ -106,28 +152,97 @@ struct Card: Identifiable, Codable, Hashable {
         isParallel: Bool = false,
         packCode: String? = nil
     ) {
-        self.name = name
-        self.cardNumber = cardNumber
-        self.color = color
-        self.type = type
-        self.cost = cost
-        self.power = power
-        self.imageName = imageName
-        self.feature = feature
-        self.attribute = attribute
-        self.counter = counter
-        self.rarity = rarity
-        self.blockIcon = blockIcon
-        self.hasBlocker = hasBlocker
-        self.hasTrigger = hasTrigger
-        self.isParallel = isParallel
-        self.packCode = packCode
+        self.init(
+            name: name,
+            cardNumber: cardNumber,
+            colors: [color],
+            type: type,
+            cost: cost,
+            power: power,
+            imageName: imageName,
+            feature: feature,
+            attributes: attribute.map { [$0] } ?? [],
+            counter: counter,
+            rarity: rarity,
+            blockIcon: blockIcon,
+            hasBlocker: hasBlocker,
+            hasTrigger: hasTrigger,
+            isParallel: isParallel,
+            packCode: packCode
+        )
+    }
+
+    // MARK: - Codable
+    // cards.jsonは、色を colors（配列）、属性を attributes（配列）で持つ。
+    // 以前の形式（color / attribute の1つだけ）のcards.jsonでも読めるようにしてある
+    // （アプリとcards.jsonの更新順がずれても、カードDBが空にならないようにするため）。
+
+    private enum CodingKeys: String, CodingKey {
+        case name, cardNumber, color, colors, type, cost, power, imageName, feature
+        case attribute, attributes, counter, rarity, blockIcon, hasBlocker, hasTrigger, isParallel, packCode
+    }
+
+    nonisolated init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try c.decode(String.self, forKey: .name)
+        cardNumber = try c.decode(String.self, forKey: .cardNumber)
+
+        if let decoded = try c.decodeIfPresent([CardColor].self, forKey: .colors), !decoded.isEmpty {
+            colors = decoded
+        } else {
+            colors = [try c.decode(CardColor.self, forKey: .color)]
+        }
+
+        type = try c.decode(CardType.self, forKey: .type)
+        cost = try c.decode(Int.self, forKey: .cost)
+        power = try c.decodeIfPresent(Int.self, forKey: .power)
+        imageName = try c.decodeIfPresent(String.self, forKey: .imageName)
+        feature = try c.decodeIfPresent(String.self, forKey: .feature)
+
+        if let decoded = try c.decodeIfPresent([CardAttribute].self, forKey: .attributes) {
+            attributes = decoded
+        } else if let single = try c.decodeIfPresent(CardAttribute.self, forKey: .attribute) {
+            attributes = [single]
+        } else {
+            attributes = []
+        }
+
+        counter = try c.decodeIfPresent(Int.self, forKey: .counter)
+        rarity = try c.decode(CardRarity.self, forKey: .rarity)
+        blockIcon = try c.decodeIfPresent(CardBlockIcon.self, forKey: .blockIcon)
+        hasBlocker = try c.decodeIfPresent(Bool.self, forKey: .hasBlocker) ?? false
+        hasTrigger = try c.decodeIfPresent(Bool.self, forKey: .hasTrigger) ?? false
+        isParallel = try c.decodeIfPresent(Bool.self, forKey: .isParallel) ?? false
+        packCode = try c.decodeIfPresent(String.self, forKey: .packCode)
+    }
+
+    nonisolated func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(name, forKey: .name)
+        try c.encode(cardNumber, forKey: .cardNumber)
+        try c.encode(colors, forKey: .colors)
+        try c.encode(type, forKey: .type)
+        try c.encode(cost, forKey: .cost)
+        try c.encodeIfPresent(power, forKey: .power)
+        try c.encodeIfPresent(imageName, forKey: .imageName)
+        try c.encodeIfPresent(feature, forKey: .feature)
+        try c.encode(attributes, forKey: .attributes)
+        try c.encodeIfPresent(counter, forKey: .counter)
+        try c.encode(rarity, forKey: .rarity)
+        try c.encodeIfPresent(blockIcon, forKey: .blockIcon)
+        try c.encode(hasBlocker, forKey: .hasBlocker)
+        try c.encode(hasTrigger, forKey: .hasTrigger)
+        try c.encode(isParallel, forKey: .isParallel)
+        try c.encodeIfPresent(packCode, forKey: .packCode)
     }
 
     /// "／"区切りの特徴を個別のタグ配列にしたもの（デッキ詳細の特徴別集計で使用）
     var featureTags: [String] {
         guard let feature, !feature.isEmpty else { return [] }
-        return feature.components(separatedBy: "／")
+        return feature
+            .components(separatedBy: "／")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
     }
 }
 

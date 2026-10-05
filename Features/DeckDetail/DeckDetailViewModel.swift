@@ -16,16 +16,33 @@ final class DeckDetailViewModel {
     private let deckStore: DeckStoreProtocol
     private let onSave: () -> Void
 
+    /// 画面を開いた時点（または最後に保存した時点）のデッキ内容。変更があるかの判定に使う。
+    private var savedSnapshot: [String]
+
     init(
         deck: Deck,
         isNew: Bool,
-        deckStore: DeckStoreProtocol = DeckStore(),
+        deckStore: DeckStoreProtocol,   // 一覧と同じインスタンスを必ず渡す（デフォルト引数で生成しない）
         onSave: @escaping () -> Void
     ) {
         self.deck = deck
         self.isNew = isNew
         self.deckStore = deckStore
         self.onSave = onSave
+        self.savedSnapshot = Self.snapshot(of: deck)
+    }
+
+    /// 保存済みの内容から変更されているか（戻る時に破棄/保存の確認を出すかの判定に使う）
+    var hasChanges: Bool {
+        Self.snapshot(of: deck) != savedSnapshot
+    }
+
+    /// デッキの「中身」だけを比較用の配列にする。
+    /// カードの並び順や、DeckEntryの内部IDの違いは変更とみなさない
+    /// （カードを外して入れ直しただけで「変更あり」にならないようにするため）。
+    private static func snapshot(of deck: Deck) -> [String] {
+        ["name:\(deck.name)", "leader:\(deck.leaderCard?.cardNumber ?? "")", "memo:\(deck.memo)"]
+            + deck.cardEntries.map { "\($0.card.cardNumber)x\($0.quantity)" }.sorted()
     }
 
     func setLeader(_ card: Card) {
@@ -78,11 +95,17 @@ final class DeckDetailViewModel {
             return false
         }
 
-        if isNew {
-            deckStore.save(deck)
-        } else {
-            deckStore.update(deck)
+        do {
+            if isNew {
+                try deckStore.save(deck)
+            } else {
+                try deckStore.update(deck)
+            }
+        } catch {
+            saveErrorMessage = error.localizedDescription
+            return false
         }
+        savedSnapshot = Self.snapshot(of: deck)
         onSave()
         return true
     }

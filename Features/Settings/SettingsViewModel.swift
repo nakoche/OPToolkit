@@ -16,7 +16,7 @@ final class SettingsViewModel {
     }
 
     func sortKey(from rawValue: String) -> CardSortKey {
-        CardSortKey(rawValue: rawValue) ?? .name
+        CardSortKey(rawValue: rawValue) ?? .releaseOrder
     }
 
     // TODO: バージョン番号などBundleから取得する値もここに集約できる

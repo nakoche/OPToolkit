@@ -10,8 +10,9 @@ final class DeckCardSelectViewModel {
     private(set) var allCards: [Card] = []
 
     /// リーダーの色に固定されたフィルタ条件。色は変更不可。
+    /// リーダーが2色の場合は、どちらかの色を持つカードが対象になる。
     var criteria: CardSearchCriteria
-    let lockedColor: CardColor
+    let lockedColors: Set<CardColor>
 
     var isFilterSheetPresented = false
 
@@ -20,11 +21,11 @@ final class DeckCardSelectViewModel {
 
     private let repository: CardRepositoryProtocol
 
-    init(lockedColor: CardColor, repository: CardRepositoryProtocol = CardRepository()) {
-        self.lockedColor = lockedColor
+    init(lockedColors: Set<CardColor>, repository: CardRepositoryProtocol = CardRepository()) {
+        self.lockedColors = lockedColors
         self.repository = repository
         var initialCriteria = CardSearchCriteria()
-        initialCriteria.selectedColors = [lockedColor]
+        initialCriteria.selectedColors = lockedColors
         self.criteria = initialCriteria
     }
 
@@ -39,7 +40,7 @@ final class DeckCardSelectViewModel {
 
     func applySearch(_ newCriteria: CardSearchCriteria) {
         var updated = newCriteria
-        updated.selectedColors = [lockedColor]   // 念のため色固定を保証
+        updated.selectedColors = lockedColors   // 念のため色固定を保証
         criteria = updated
     }
 

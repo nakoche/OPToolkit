@@ -6,6 +6,9 @@
 import Foundation
 
 struct Deck: Identifiable, Codable, Hashable {
+    /// 同じカード（同じカード番号）をデッキに入れられる上限枚数
+    static let maxCopiesPerCard = 4
+
     let id: UUID
     var name: String
     var leaderCard: Card?
@@ -98,17 +101,26 @@ extension Deck {
     }
 
     /// 特徴（"／"区切りのタグ）ごとの合計枚数。0枚のものは含まれない。
-    /// 出現数の多い順で返す。
+    /// 出現数の多い順で返す。枚数が同じ特徴は、デッキ内で先に出てきた順に並べる。
+    /// （Dictionaryの並びは再計算のたびに変わるため、同数の特徴の順番が入れ替わらないよう
+    ///  同数のときの順番を明示している。メモ入力などで画面が再描画されても並びは変わらない）
     var featureCounts: [(feature: String, count: Int)] {
         var counts: [String: Int] = [:]
+        var firstSeenOrder: [String: Int] = [:]
         for entry in cardEntries {
             for tag in entry.card.featureTags {
                 counts[tag, default: 0] += entry.quantity
+                if firstSeenOrder[tag] == nil {
+                    firstSeenOrder[tag] = firstSeenOrder.count
+                }
             }
         }
         return counts
             .map { (feature: $0.key, count: $0.value) }
-            .sorted { $0.count > $1.count }
+            .sorted { lhs, rhs in
+                if lhs.count != rhs.count { return lhs.count > rhs.count }
+                return (firstSeenOrder[lhs.feature] ?? 0) < (firstSeenOrder[rhs.feature] ?? 0)
+            }
     }
 }
 

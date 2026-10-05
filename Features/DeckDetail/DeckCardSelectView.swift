@@ -15,7 +15,6 @@
 //
 
 import SwiftUI
-import Kingfisher
 
 struct DeckCardSelectView: View {
     @State var viewModel: DeckCardSelectViewModel
@@ -26,6 +25,19 @@ struct DeckCardSelectView: View {
     let onClose: () -> Void
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 5)
+
+    // 画面上部の「現在のデッキ」サムネイル
+    private let thumbnailWidth: CGFloat = 44
+    private let thumbnailSpacing: CGFloat = 6
+    /// サムネイル領域の最大行数。これを超える枚数が選ばれたら、領域の中だけが縦にスクロールする
+    /// （カード一覧が押し出されて見えなくなるのを防ぐための上限）
+    private let maxPreviewRows = 3
+    /// サムネイル領域の中身の高さ（枚数に合わせて高さを伸ばすために測定する）
+    @State private var previewContentHeight: CGFloat = 0
+    /// タップでカードを追加した回数。変化するたびに軽い振動で知らせる（追加できなかったときは変えない）
+    @State private var addFeedbackCount = 0
+    /// 上部のサムネイルをタップしてカードを減らした回数。変化するたびに、追加と同じ強さの振動で知らせる
+    @State private var removeFeedbackCount = 0
 
     var body: some View {
         ZStack {
@@ -45,7 +57,12 @@ struct DeckCardSelectView: View {
                                             .padding(3)
                                     }
                                 }
+                                // タップで1枚追加（上限4枚）
                                 .onTapGesture {
+                                    addOne(card)
+                                }
+                                // 長押しで、拡大表示＋枚数を直接指定するモーダルを開く
+                                .onLongPressGesture(minimumDuration: 0.4) {
                                     withAnimation(.easeOut(duration: 0.18)) {
                                         viewModel.selectCard(card)
                                     }
@@ -55,23 +72,32 @@ struct DeckCardSelectView: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 12)
                 }
-                .safeAreaInset(edge: .top) {
+                // 下に浮かせたボタンが、一番下の行のカードに重なって押せなくならないよう、スクロール末尾に余白を足す
+                .contentMargins(.bottom, 88, for: .scrollContent)
+                .safeAreaInset(edge: .top, spacing: 0) {
                     addedCardsPreview
                 }
-                .navigationTitle("デッキカードを選択")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button("完了", action: onClose)
+                .overlay(alignment: .bottom) {
+                    // 枚数指定モーダルの表示中は隠す（モーダルのバツボタンと位置が重なって見づらくなるため）
+                    if viewModel.selectedCard == nil {
+                        floatingButtons
+                            .transition(.opacity)
                     }
                 }
-                .overlay(alignment: .bottomTrailing) {
-                    filterButton
+                // ナビゲーションバーを隠して、サムネイル領域を画面の上端に寄せる
+                .toolbar(.hidden, for: .navigationBar)
+                // カードを追加できたときの、軽い振動
+                .sensoryFeedback(.impact(weight: .light), trigger: addFeedbackCount)
+                // カードを減らしたときの振動（追加と同じ強さ）
+                .sensoryFeedback(.impact(weight: .light), trigger: removeFeedbackCount)
+                // 長押しでモーダルが開いたときの振動（閉じるときは鳴らさない）
+                .sensoryFeedback(.impact(weight: .medium), trigger: viewModel.selectedCard) { _, newValue in
+                    newValue != nil
                 }
                 .fullScreenCover(isPresented: $viewModel.isFilterSheetPresented) {
                     CardSearchSheet(
                         criteria: viewModel.criteria,
-                        lockedColors: [viewModel.lockedColor],
+                        lockedColors: viewModel.lockedColors,
                         onSearch: { newCriteria in
                             viewModel.applySearch(newCriteria)
                             viewModel.isFilterSheetPresented = false
@@ -108,8 +134,9 @@ struct DeckCardSelectView: View {
         }
     }
 
-    /// 画面上部：現在デッキに入っているカードのサムネイルを横スクロールで並べる。
+    /// 画面上部：現在デッキに入っているカードのサムネイルを、折り返して並べる。
     /// 選んだカードがその場で追加されていくのが見えるようにするための領域。
+    /// 高さは枚数（行数）に合わせて伸び、maxPreviewRows行を超えたらその中だけスクロールする。
     private var addedCardsPreview: some View {
         let entries = deckEntries()
         let total = entries.reduce(0) { $0 + $1.quantity }
@@ -126,37 +153,47 @@ struct DeckCardSelectView: View {
             .padding(.horizontal, 16)
 
             if entries.isEmpty {
-                Text("まだカードが選択されていません")
+                Text("カードをタップで追加／長押しで拡大・枚数指定")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 4)
+                    .padding(.bottom, 8)
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
+                ScrollView(.vertical, showsIndicators: false) {
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: thumbnailWidth, maximum: thumbnailWidth), spacing: thumbnailSpacing)],
+                        alignment: .leading,
+                        spacing: thumbnailSpacing
+                    ) {
                         ForEach(entries) { entry in
                             addedCardThumbnail(entry)
                         }
                     }
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
+                    .onGeometryChange(for: CGFloat.self) { proxy in
+                        proxy.size.height
+                    } action: { newHeight in
+                        previewContentHeight = newHeight
+                    }
                 }
+                .scrollBounceBehavior(.basedOnSize)
+                .frame(height: min(previewContentHeight, maxPreviewHeight))
+                .padding(.bottom, 8)
             }
         }
-        .padding(.top, 10)
+        .padding(.top, 4)
         .background(.ultraThinMaterial)
     }
 
+    private var maxPreviewHeight: CGFloat {
+        let thumbnailHeight = thumbnailWidth * 3.5 / 2.5
+        let rows = CGFloat(maxPreviewRows)
+        return thumbnailHeight * rows + thumbnailSpacing * (rows - 1)
+    }
+
     private func addedCardThumbnail(_ entry: DeckEntry) -> some View {
-        RoundedRectangle(cornerRadius: 5)
-            .fill(Color(uiColor: .systemGray5))
-            .aspectRatio(2.5 / 3.5, contentMode: .fit)
-            .frame(width: 44)
-            .overlay {
-                KFImage(entry.card.imageURL)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
+        CardThumbnailImage(card: entry.card, cornerRadius: 5)
+            .frame(width: thumbnailWidth)
             .overlay(alignment: .bottomTrailing) {
                 Text("×\(entry.quantity)")
                     .font(.system(size: 9, weight: .bold))
@@ -165,11 +202,42 @@ struct DeckCardSelectView: View {
                     .foregroundStyle(.white)
                     .padding(2)
             }
+            // タップで1枚減らす（0枚になったらデッキから外れる）
             .onTapGesture {
-                withAnimation(.easeOut(duration: 0.18)) {
-                    viewModel.selectCard(entry.card)
-                }
+                removeFeedbackCount += 1
+                onConfirm(entry.card, entry.quantity - 1)
             }
+    }
+
+    /// カード一覧のタップ：1枚追加する。追加できたときだけ振動する。
+    /// 上限（4枚）のときは何もしない（振動もしない。カードの「×4」の表示で上限だと分かる）。
+    private func addOne(_ card: Card) {
+        let current = currentQuantity(card)
+        guard current < Deck.maxCopiesPerCard else { return }
+        addFeedbackCount += 1
+        onConfirm(card, current + 1)
+    }
+
+    /// カード一覧の上に浮かせて表示するボタン：「完了」を下の中央に、フィルタを右端に置く。
+    /// 片手でも押しやすいよう、完了ボタンは下の中央にしている。
+    private var floatingButtons: some View {
+        ZStack {
+            Button(action: onClose) {
+                Text("完了")
+                    .font(.headline)
+                    .frame(width: 160)
+                    .padding(.vertical, 14)
+            }
+            .buttonStyle(.borderedProminent)
+            .shadow(radius: 4, y: 2)
+
+            HStack {
+                Spacer()
+                filterButton
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 20)
     }
 
     private var filterButton: some View {
@@ -183,15 +251,13 @@ struct DeckCardSelectView: View {
                 .background(.tint, in: Circle())
                 .shadow(radius: 4, y: 2)
         }
-        .padding(.trailing, 20)
-        .padding(.bottom, 20)
         .accessibilityLabel("フィルタ・並び替え")
     }
 }
 
 #Preview {
     DeckCardSelectView(
-        viewModel: DeckCardSelectViewModel(lockedColor: .red, repository: MockCardRepository()),
+        viewModel: DeckCardSelectViewModel(lockedColors: [.red], repository: MockCardRepository()),
         currentQuantity: { _ in 0 },
         deckEntries: { [DeckEntry(card: .sampleZoro, quantity: 3)] },
         onConfirm: { _, _ in },

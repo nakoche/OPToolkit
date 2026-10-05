@@ -13,7 +13,7 @@ struct SettingsView: View {
 
     @AppStorage(SettingsStore.Key.colorScheme) private var colorSchemeRawValue: String = AppColorScheme.system.rawValue
     @AppStorage(SettingsStore.Key.enableSoundEffects) private var enableSoundEffects: Bool = true
-    @AppStorage(SettingsStore.Key.defaultSortKey) private var defaultSortKeyRawValue: String = CardSortKey.name.rawValue
+    @AppStorage(SettingsStore.Key.defaultSortKey) private var defaultSortKeyRawValue: String = CardSortKey.releaseOrder.rawValue
 
     private var selectedColorScheme: Binding<AppColorScheme> {
         Binding(

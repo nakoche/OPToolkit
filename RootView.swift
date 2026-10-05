@@ -11,22 +11,28 @@ import SwiftUI
 struct RootView: View {
     @AppStorage(SettingsStore.Key.colorScheme) private var colorSchemeRawValue: String = AppColorScheme.system.rawValue
 
+    // bodyが再評価されるたびに作り直されないよう、各画面のViewModelはここで1回だけ保持する
+    @State private var cardListViewModel = CardListViewModel()
+    @State private var deckListViewModel = DeckListViewModel()
+    @State private var soloPlayViewModel = SoloPlayViewModel()
+    @State private var settingsViewModel = SettingsViewModel()
+
     private var preferredColorScheme: ColorScheme? {
         (AppColorScheme(rawValue: colorSchemeRawValue) ?? .system).colorScheme
     }
 
     var body: some View {
         TabView {
-            CardListView(viewModel: CardListViewModel())
+            CardListView(viewModel: cardListViewModel)
                 .tabItem { Label("カード", systemImage: "rectangle.stack") }
 
-            DeckListView(viewModel: DeckListViewModel())
+            DeckListView(viewModel: deckListViewModel)
                 .tabItem { Label("デッキ", systemImage: "square.stack.3d.up") }
 
-            SoloPlayView(viewModel: SoloPlayViewModel())
+            SoloPlayView(viewModel: soloPlayViewModel)
                 .tabItem { Label("一人回し", systemImage: "gamecontroller") }
 
-            SettingsView(viewModel: SettingsViewModel())
+            SettingsView(viewModel: settingsViewModel)
                 .tabItem { Label("設定", systemImage: "gearshape") }
         }
         .preferredColorScheme(preferredColorScheme)

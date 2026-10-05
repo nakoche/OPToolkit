@@ -8,7 +8,6 @@
 //
 
 import SwiftUI
-import Kingfisher
 
 struct CardQuantityModal: View {
     let card: Card
@@ -18,7 +17,7 @@ struct CardQuantityModal: View {
 
     @State private var quantity: Int
 
-    private let maxQuantity = 4
+    private let maxQuantity = Deck.maxCopiesPerCard
 
     init(card: Card, initialQuantity: Int, onConfirm: @escaping (Int) -> Void, onCancel: @escaping () -> Void) {
         self.card = card
@@ -49,32 +48,41 @@ struct CardQuantityModal: View {
                 Button {
                     onConfirm(quantity)
                 } label: {
-                    Text("デッキに追加")
+                    Text(confirmTitle)
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(quantity <= 0)
+                .tint(isRemoving ? .red : .accentColor)
+                .disabled(!canConfirm)
                 .padding(.horizontal, 40)
 
-                Spacer()
-
+                // 下側にSpacerを置かないことで、バツボタン以外の全体がバツボタンの真上に寄る
+                // （「デッキに追加」ボタンとバツボタンの間隔は、VStackのspacingの24pt）
                 closeButton
                     .padding(.bottom, 24)
             }
         }
     }
 
+    /// 既にデッキに入っているカードを0枚にしようとしている状態（＝デッキから外す）
+    private var isRemoving: Bool {
+        quantity == 0 && initialQuantity > 0
+    }
+
+    private var confirmTitle: String {
+        isRemoving ? "デッキから外す" : "デッキに追加"
+    }
+
+    /// 0枚のままでも、元々デッキに入っていれば「外す」ために押せる。
+    /// 元々入っておらず0枚のままなら、何も変わらないので押せない。
+    private var canConfirm: Bool {
+        quantity > 0 || initialQuantity > 0
+    }
+
     private var cardImage: some View {
-        RoundedRectangle(cornerRadius: 12)
-            .fill(.white.opacity(0.06))
-            .aspectRatio(2.5 / 3.5, contentMode: .fit)
-            .overlay {
-                KFImage(card.imageURL)
-                    .font(.system(size: 32))
-                    .foregroundStyle(.white.opacity(0.6))
-            }
+        CardThumbnailImage(card: card, cornerRadius: 12)
     }
 
     private var stepper: some View {

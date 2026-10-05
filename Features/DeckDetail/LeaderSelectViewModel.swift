@@ -59,7 +59,10 @@ final class LeaderSelectViewModel {
         }
 
         if !selectedColors.isEmpty {
-            cards = cards.filter { selectedColors.contains($0.color) }
+            // 2色のリーダーは、どちらかの色が選択されていれば対象（OR）
+            cards = cards.filter { card in
+                card.colors.contains { selectedColors.contains($0) }
+            }
         }
 
         cards = cards.filter { parallelMode.matches($0) }
