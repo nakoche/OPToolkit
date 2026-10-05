@@ -91,8 +91,19 @@ struct DeckImagePreviewModal: View {
     }
 
     private func performSave() {
+        // UIImageをそのまま渡すと、写真ライブラリ側でJPEG圧縮（CMPhotoCompressionSession）が走り、
+        // 失敗することがあった（err=-16990）。PNGデータをそのまま保存すれば圧縮を経由しない。
+        // QRコードがにじまないという利点もある。
+        guard let data = image.pngData() else {
+            DispatchQueue.main.async {
+                resultMessage = "画像データの作成に失敗しました"
+            }
+            return
+        }
+
         PHPhotoLibrary.shared().performChanges {
-            PHAssetChangeRequest.creationRequestForAsset(from: image)
+            let request = PHAssetCreationRequest.forAsset()
+            request.addResource(with: .photo, data: data, options: nil)
         } completionHandler: { success, error in
             DispatchQueue.main.async {
                 if success {

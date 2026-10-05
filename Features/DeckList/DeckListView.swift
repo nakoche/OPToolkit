@@ -31,7 +31,9 @@ struct DeckListView: View {
         NavigationStack(path: $path) {
             ZStack(alignment: .bottomTrailing) {
                 Group {
-                    if viewModel.decks.isEmpty {
+                    if !viewModel.hasLoaded {
+                        ProgressView()
+                    } else if viewModel.decks.isEmpty {
                         ContentUnavailableView(
                             "デッキがありません",
                             systemImage: "square.stack.3d.up.slash",
@@ -50,6 +52,21 @@ struct DeckListView: View {
                 floatingButtons
             }
             .navigationTitle("デッキ")
+            .task {
+                await viewModel.load()
+            }
+            // デッキの保存（ディスクへの書き込み）に失敗したときの通知
+            .alert(
+                "保存できません",
+                isPresented: Binding(
+                    get: { viewModel.storageErrorMessage != nil },
+                    set: { if !$0 { viewModel.storageErrorMessage = nil } }
+                )
+            ) {
+                Button("OK") { viewModel.storageErrorMessage = nil }
+            } message: {
+                Text(viewModel.storageErrorMessage ?? "")
+            }
             .navigationDestination(for: DeckListRoute.self) { route in
                 switch route {
                 case .existing(let deck):
@@ -119,6 +136,17 @@ struct DeckListView: View {
                     .transition(.opacity)
                 }
             }
+            // 画像生成中のインジケーター（カード画像の取得待ち）
+            .overlay {
+                if viewModel.isGeneratingImage {
+                    ZStack {
+                        Color.black.opacity(0.3).ignoresSafeArea()
+                        ProgressView("画像を作成中…")
+                            .padding(20)
+                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                }
+            }
         }
     }
 
@@ -163,7 +191,7 @@ struct DeckListView: View {
                 deck: deck,
                 onOpenDetail: { path.append(DeckListRoute.existing(deck)) },
                 onBattleHistory: { path.append(DeckListRoute.battleHistory(deck)) },
-                onShowImage: { viewModel.generateShareImage(for: deck) },
+                onShowImage: { Task { await viewModel.generateShareImage(for: deck) } },
                 onCopy: { viewModel.copyDeck(deck) }
             )
 

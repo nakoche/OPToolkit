@@ -65,7 +65,10 @@ struct CardSearchCriteria: Equatable {
         }
 
         if !selectedColors.isEmpty {
-            result = result.filter { selectedColors.contains($0.color) }
+            // 2色のカードは、どちらかの色が選択されていれば対象（OR）
+            result = result.filter { card in
+                card.colors.contains { selectedColors.contains($0) }
+            }
         }
 
         if !selectedTypes.isEmpty {
@@ -94,9 +97,9 @@ struct CardSearchCriteria: Equatable {
         }
 
         if !selectedAttributes.isEmpty {
+            // 属性を2つ持つカードも、どちらかが選択されていれば対象（OR）
             result = result.filter { card in
-                guard let attribute = card.attribute else { return false }
-                return selectedAttributes.contains(attribute)
+                card.attributes.contains { selectedAttributes.contains($0) }
             }
         }
 

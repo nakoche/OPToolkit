@@ -135,7 +135,7 @@ struct CardSearchSheet: View {
                     section("レアリティ") {
                         // 常に1行（7列固定）で表示する。SECのような3文字ラベルは
                         // FilterChip側でminimumScaleFactorを使って自動縮小させる。
-                        LazyVGrid(columns: gridColumns(7), spacing: 6) {
+                        LazyVGrid(columns: gridColumns(5), spacing: 6) {
                             ForEach(CardRarity.allCases) { rarity in
                                 FilterChip(
                                     label: rarity.rawValue,
