@@ -4,16 +4,20 @@
 //
 //  カードタップ時に表示する拡大表示。
 //  カード情報は出さず、画像のみを大きく見せる「ライトボックス」方式。
-//  背景は半透明の黒、閉じるボタンは画面下部中央（親指が届く位置）に固定。
+//  背景は半透明の黒で、背景をタップすると閉じる（閉じるボタンは置かない）。
 //  上下左右どの向きにドラッグしても、一定距離を超えるとスワイプで閉じられる。
+//  accessory を渡すと、カード画像の下に追加の部品を並べられる（一人回しの、パワー・コスト変更パネルなど）。
+//  渡さなければ、これまでどおり画像だけが中央に出る。
 //
 
 import SwiftUI
 import Kingfisher
 
-struct CardDetailModal: View {
+struct CardDetailModal<Accessory: View>: View {
     let card: Card
     let onClose: () -> Void
+    /// カード画像の下に出す追加の部品
+    let accessory: Accessory
 
     /// ドラッグに追従させる画像のオフセット
     @State private var dragOffset: CGSize = .zero
@@ -22,24 +26,30 @@ struct CardDetailModal: View {
     /// これ以上ドラッグしたら閉じる、とみなす距離（pt）
     private let dismissThreshold: CGFloat = 120
 
+    init(card: Card, onClose: @escaping () -> Void, @ViewBuilder accessory: () -> Accessory) {
+        self.card = card
+        self.onClose = onClose
+        self.accessory = accessory()
+    }
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.85 * backgroundOpacityRatio)
                 .ignoresSafeArea()
                 .onTapGesture(perform: onClose)   // 背景タップでも閉じられるようにしておく
 
-            VStack {
-                Spacer()
+            VStack(spacing: 12) {
+                Spacer(minLength: 0)
 
                 cardImage
                     .padding(.horizontal, 32)
                     .offset(dragOffset)
                     .gesture(dragToDismissGesture)
 
-                Spacer()
+                // 何も渡されていなければ、ここには何も出ない
+                accessory
 
-                closeButton
-                    .padding(.bottom, 24)   // safeAreaとは別に、親指がさらに届きやすいよう余白を厚めに
+                Spacer(minLength: 0)
             }
         }
     }
@@ -106,15 +116,12 @@ struct CardDetailModal: View {
         .foregroundStyle(.white.opacity(0.6))
     }
 
-    private var closeButton: some View {
-        Button(action: onClose) {
-            Image(systemName: "xmark")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(.white)
-                .frame(width: 52, height: 52)
-                .background(.white.opacity(0.15), in: Circle())
-        }
-        .accessibilityLabel("閉じる")
+}
+
+// accessory なしで使うための初期化（カードリストなど、これまでの呼び出しはそのまま使える）
+extension CardDetailModal where Accessory == EmptyView {
+    init(card: Card, onClose: @escaping () -> Void) {
+        self.init(card: card, onClose: onClose) { EmptyView() }
     }
 }
 
