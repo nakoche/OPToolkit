@@ -84,6 +84,7 @@ struct Card: Identifiable, Codable, Hashable {
     var counter: Int?             // 1000 / 2000 / なし(nil)
     var rarity: CardRarity
     var blockIcon: CardBlockIcon? // 主にリーダーカードが持つ。持たない種別はnil
+    var life: Int?                // リーダーのライフ値。リーダー以外はnil（一人回しの準備で、ライフに置く枚数に使う）
     var hasBlocker: Bool          // ブロッカーを持つか（デッキ詳細の集計で使用）
     var hasTrigger: Bool          // トリガーを持つか（デッキ詳細の集計で使用）
     var isParallel: Bool          // パラレル版カードかどうか（リーダー選択画面のパラレル表示切替で使用）
@@ -109,6 +110,7 @@ struct Card: Identifiable, Codable, Hashable {
         counter: Int? = nil,
         rarity: CardRarity = .common,
         blockIcon: CardBlockIcon? = nil,
+        life: Int? = nil,
         hasBlocker: Bool = false,
         hasTrigger: Bool = false,
         isParallel: Bool = false,
@@ -127,6 +129,7 @@ struct Card: Identifiable, Codable, Hashable {
         self.counter = counter
         self.rarity = rarity
         self.blockIcon = blockIcon
+        self.life = life
         self.hasBlocker = hasBlocker
         self.hasTrigger = hasTrigger
         self.isParallel = isParallel
@@ -147,6 +150,7 @@ struct Card: Identifiable, Codable, Hashable {
         counter: Int? = nil,
         rarity: CardRarity = .common,
         blockIcon: CardBlockIcon? = nil,
+        life: Int? = nil,
         hasBlocker: Bool = false,
         hasTrigger: Bool = false,
         isParallel: Bool = false,
@@ -165,6 +169,7 @@ struct Card: Identifiable, Codable, Hashable {
             counter: counter,
             rarity: rarity,
             blockIcon: blockIcon,
+            life: life,
             hasBlocker: hasBlocker,
             hasTrigger: hasTrigger,
             isParallel: isParallel,
@@ -179,7 +184,7 @@ struct Card: Identifiable, Codable, Hashable {
 
     private enum CodingKeys: String, CodingKey {
         case name, cardNumber, color, colors, type, cost, power, imageName, feature
-        case attribute, attributes, counter, rarity, blockIcon, hasBlocker, hasTrigger, isParallel, packCode
+        case attribute, attributes, counter, rarity, blockIcon, life, hasBlocker, hasTrigger, isParallel, packCode
     }
 
     nonisolated init(from decoder: Decoder) throws {
@@ -210,6 +215,8 @@ struct Card: Identifiable, Codable, Hashable {
         counter = try c.decodeIfPresent(Int.self, forKey: .counter)
         rarity = try c.decode(CardRarity.self, forKey: .rarity)
         blockIcon = try c.decodeIfPresent(CardBlockIcon.self, forKey: .blockIcon)
+        // 以前のcards.jsonにはlifeが無いので、無ければnilにする
+        life = try c.decodeIfPresent(Int.self, forKey: .life)
         hasBlocker = try c.decodeIfPresent(Bool.self, forKey: .hasBlocker) ?? false
         hasTrigger = try c.decodeIfPresent(Bool.self, forKey: .hasTrigger) ?? false
         isParallel = try c.decodeIfPresent(Bool.self, forKey: .isParallel) ?? false
@@ -230,6 +237,7 @@ struct Card: Identifiable, Codable, Hashable {
         try c.encodeIfPresent(counter, forKey: .counter)
         try c.encode(rarity, forKey: .rarity)
         try c.encodeIfPresent(blockIcon, forKey: .blockIcon)
+        try c.encodeIfPresent(life, forKey: .life)
         try c.encode(hasBlocker, forKey: .hasBlocker)
         try c.encode(hasTrigger, forKey: .hasTrigger)
         try c.encode(isParallel, forKey: .isParallel)
@@ -259,7 +267,8 @@ extension Card {
         feature: "麦わらの一味",
         attribute: .strike,
         rarity: .leader,
-        blockIcon: .four
+        blockIcon: .four,
+        life: 5
     )
 
     static let sampleLuffyParallel = Card(
@@ -273,6 +282,7 @@ extension Card {
         attribute: .strike,
         rarity: .leader,
         blockIcon: .four,
+        life: 5,
         isParallel: true
     )
 
@@ -320,6 +330,7 @@ extension Card {
             counter: (type == .character) ? counter : nil,
             rarity: rarities[index % rarities.count],
             blockIcon: (type == .leader) ? blockIcons[index % blockIcons.count] : nil,
+            life: (type == .leader) ? 4 : nil,
             hasBlocker: type == .character && index % 4 == 0,
             hasTrigger: index % 5 == 0,
             isParallel: index % 6 == 0

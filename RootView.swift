@@ -13,9 +13,17 @@ struct RootView: View {
 
     // bodyが再評価されるたびに作り直されないよう、各画面のViewModelはここで1回だけ保持する
     @State private var cardListViewModel = CardListViewModel()
-    @State private var deckListViewModel = DeckListViewModel()
-    @State private var soloPlayViewModel = SoloPlayViewModel()
+    @State private var deckListViewModel: DeckListViewModel
+    @State private var soloPlayViewModel: SoloPlayViewModel
     @State private var settingsViewModel = SettingsViewModel()
+
+    init() {
+        // デッキ画面と一人回しが同じ保存先（DeckStore）を見るよう、1つだけ作って渡す。
+        // 別々に作ると、デッキ画面で編集した内容が一人回しに反映されなくなる。
+        let deckListViewModel = DeckListViewModel()
+        _deckListViewModel = State(initialValue: deckListViewModel)
+        _soloPlayViewModel = State(initialValue: SoloPlayViewModel(deckStore: deckListViewModel.store))
+    }
 
     private var preferredColorScheme: ColorScheme? {
         (AppColorScheme(rawValue: colorSchemeRawValue) ?? .system).colorScheme
