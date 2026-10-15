@@ -95,15 +95,7 @@ struct LeaderSelectView: View {
             }
 
             // パラレル表示切替（星アイコン）。タップで ノーマルのみ→混在→パラレルのみ… と循環する。
-            Button {
-                viewModel.parallelMode.advance()
-            } label: {
-                Image(systemName: viewModel.parallelMode.symbolName)
-                    .font(.system(size: 20))
-                    .foregroundStyle(.yellow)
-                    .frame(width: 36, height: 36)
-                    .background(Color(uiColor: .systemGray5), in: Circle())
-            }
+            ParallelModeButton(mode: $viewModel.parallelMode)
             .accessibilityLabel("パラレル表示切替")
         }
     }

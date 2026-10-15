@@ -12,6 +12,9 @@ final class CardListViewModel {
     var criteria = CardSearchCriteria()
     var isSearchSheetPresented = false
     var selectedCard: Card?   // nilでない間、詳細表示が出る
+    /// パラレル表示の切り替え（検索欄の右のボタン）。
+    /// 検索シートの条件（criteria）とは別に持つ。シートで「検索」を押しても変わらない。
+    var parallelMode: ParallelDisplayMode = .mixed
 
     private let repository: CardRepositoryProtocol
 
@@ -20,7 +23,8 @@ final class CardListViewModel {
     }
 
     var filteredCards: [Card] {
-        criteria.apply(to: allCards)
+        // 並び替え済みの結果に対してパラレルだけ絞るので、並び順は変わらない
+        criteria.apply(to: allCards).filter { parallelMode.matches($0) }
     }
 
     func loadCards() async {

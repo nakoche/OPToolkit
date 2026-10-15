@@ -86,14 +86,17 @@ struct CardListView: View {
     }
 
     // MARK: - 下部固定フッター（1段目: フィルタボタン、2段目: 検索欄）
-
     private var bottomBar: some View {
         VStack(spacing: 10) {
             HStack {
                 Spacer()
                 filterButton
             }
-            searchField
+            // 検索欄の右にパラレル表示切替を置く（検索欄はボタンの分だけ縮む）
+            HStack(spacing: 10) {
+                searchField
+                ParallelModeButton(mode: $viewModel.parallelMode, size: 40)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.top, 10)

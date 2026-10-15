@@ -26,6 +26,10 @@ struct DeckCardSelectView: View {
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 5)
 
+    // 右下に浮かせる、フィルタ／パラレル表示切替ボタンの大きさと縦の間隔
+    private let sideButtonSize: CGFloat = 56
+    private let sideButtonSpacing: CGFloat = 12
+
     // 画面上部の「現在のデッキ」サムネイル
     private let thumbnailWidth: CGFloat = 44
     private let thumbnailSpacing: CGFloat = 6
@@ -72,8 +76,9 @@ struct DeckCardSelectView: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 12)
                 }
-                // 下に浮かせたボタンが、一番下の行のカードに重なって押せなくならないよう、スクロール末尾に余白を足す
-                .contentMargins(.bottom, 88, for: .scrollContent)
+                // 下に浮かせたボタンが、一番下の行のカードに重なって押せなくならないよう、スクロール末尾に余白を足す。
+                // 右端はボタンが2つ縦に並ぶので、その高さ（下の余白20＋ボタン2つ＋間隔）に少し足した分を確保する
+                .contentMargins(.bottom, 20 + sideButtonSize * 2 + sideButtonSpacing + 8, for: .scrollContent)
                 .safeAreaInset(edge: .top, spacing: 0) {
                     addedCardsPreview
                 }
@@ -218,7 +223,8 @@ struct DeckCardSelectView: View {
         onConfirm(card, current + 1)
     }
 
-    /// カード一覧の上に浮かせて表示するボタン：「完了」を下の中央に、フィルタを右端に置く。
+    /// カード一覧の上に浮かせて表示するボタン：「完了」を下の中央に、右端に2つ縦に並べる。
+    /// 右端は、下がパラレル表示切替（以前フィルタボタンがあった位置）、その上がフィルタ。
     /// 片手でも押しやすいよう、完了ボタンは下の中央にしている。
     private var floatingButtons: some View {
         ZStack {
@@ -233,7 +239,14 @@ struct DeckCardSelectView: View {
 
             HStack {
                 Spacer()
+                ParallelModeButton(mode: $viewModel.parallelMode, size: sideButtonSize)
+                    .shadow(radius: 4, y: 2)
+            }
+            // フィルタボタンは、レイアウトに影響しないoverlayでパラレル切替の真上に重ねる。
+            // こうすると「完了」やパラレル切替の位置が、2つ並べる前から動かない。
+            .overlay(alignment: .topTrailing) {
                 filterButton
+                    .offset(y: -(sideButtonSize + sideButtonSpacing))
             }
         }
         .padding(.horizontal, 20)
@@ -247,7 +260,7 @@ struct DeckCardSelectView: View {
             Image(systemName: "camera.filters")
                 .font(.title2.weight(.semibold))
                 .foregroundStyle(.white)
-                .frame(width: 56, height: 56)
+                .frame(width: sideButtonSize, height: sideButtonSize)
                 .background(.tint, in: Circle())
                 .shadow(radius: 4, y: 2)
         }

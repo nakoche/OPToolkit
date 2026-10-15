@@ -16,6 +16,10 @@ final class DeckCardSelectViewModel {
 
     var isFilterSheetPresented = false
 
+    /// パラレル表示の切り替え（フィルタボタンの下のボタン）。
+    /// フィルタシートの条件（criteria）とは別に持つ。シートで「検索」を押しても変わらない。
+    var parallelMode: ParallelDisplayMode = .mixed
+
     /// タップされたカード（数量選択モーダルの対象）
     var selectedCard: Card?
 
@@ -31,7 +35,9 @@ final class DeckCardSelectViewModel {
 
     /// リーダーは選択対象から常に除外する
     var filteredCards: [Card] {
+        // 並び替え済みの結果に対してパラレルだけ絞るので、並び順は変わらない
         criteria.apply(to: allCards.filter { $0.type != .leader })
+            .filter { parallelMode.matches($0) }
     }
 
     func loadCards() async {
