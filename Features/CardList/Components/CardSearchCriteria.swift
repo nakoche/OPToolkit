@@ -40,9 +40,19 @@ enum CounterOption: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
+/// ♡（お気に入り）フィルタの選択肢。
+/// どちらも選ばない場合と、両方選んだ場合は、お気に入りでは絞り込まない（すべて表示）
+enum FavoriteOption: String, CaseIterable, Identifiable, Hashable {
+    case favorite = "お気に入り"
+    case notFavorite = "お気に入り以外"
+
+    var id: String { rawValue }
+}
+
 struct CardSearchCriteria: Equatable {
     var searchText: String = ""
     var selectedColors: Set<CardColor> = []
+    var selectedFavorites: Set<FavoriteOption> = []
     var selectedTypes: Set<CardType> = []
     var featureQuery: String = ""
     var selectedCosts: Set<CostOption> = []
@@ -54,8 +64,9 @@ struct CardSearchCriteria: Equatable {
     var sortKey: CardSortKey = .releaseOrder   // デフォルトは発売順（最新弾→古い弾）
     var sortDirection: SortDirection = .ascending
 
-    /// フィルタ・検索を適用したカード一覧を返す
-    func apply(to cards: [Card]) -> [Card] {
+    /// フィルタ・検索を適用したカード一覧を返す。
+    /// favoriteCardNumbers は、♡フィルタの判定に使うお気に入りのカード番号（♡フィルタを使わない画面は省略してよい）
+    func apply(to cards: [Card], favoriteCardNumbers: Set<String> = []) -> [Card] {
         var result = cards
 
         if !searchText.isEmpty {
@@ -69,6 +80,13 @@ struct CardSearchCriteria: Equatable {
             result = result.filter { card in
                 card.colors.contains { selectedColors.contains($0) }
             }
+        }
+
+        // ♡: 片方だけ選ばれているときだけ絞り込む（空・両方は、すべて表示）
+        if selectedFavorites == [.favorite] {
+            result = result.filter { favoriteCardNumbers.contains($0.cardNumber) }
+        } else if selectedFavorites == [.notFavorite] {
+            result = result.filter { !favoriteCardNumbers.contains($0.cardNumber) }
         }
 
         if !selectedTypes.isEmpty {

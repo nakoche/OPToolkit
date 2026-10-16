@@ -22,6 +22,9 @@ struct CardSearchSheet: View {
     /// 非nilの場合、色フィルタをこの色だけに固定し、変更不可にする（デッキカード選択画面用）
     let lockedColors: Set<CardColor>?
 
+    /// trueのとき、「色」と「コスト」の間に♡（お気に入り）フィルタを出す（カードリスト画面用）
+    let showsFavoriteFilter: Bool
+
     let onSearch: (CardSearchCriteria) -> Void
     let onCancel: () -> Void
 
@@ -30,6 +33,7 @@ struct CardSearchSheet: View {
     init(
         criteria: CardSearchCriteria,
         lockedColors: Set<CardColor>? = nil,
+        showsFavoriteFilter: Bool = false,
         onSearch: @escaping (CardSearchCriteria) -> Void,
         onCancel: @escaping () -> Void
     ) {
@@ -39,6 +43,7 @@ struct CardSearchSheet: View {
         }
         _criteria = State(initialValue: initial)
         self.lockedColors = lockedColors
+        self.showsFavoriteFilter = showsFavoriteFilter
         self.onSearch = onSearch
         self.onCancel = onCancel
     }
@@ -76,6 +81,21 @@ struct CardSearchSheet: View {
                                 }
                                 .disabled(lockedColors != nil)
                                 .opacity(lockedColors != nil ? 0.7 : 1)
+                            }
+                        }
+                    }
+
+                    if showsFavoriteFilter {
+                        section("♡") {
+                            LazyVGrid(columns: gridColumns(2), spacing: 8) {
+                                ForEach(FavoriteOption.allCases) { option in
+                                    FilterChip(
+                                        label: option.rawValue,
+                                        isSelected: criteria.selectedFavorites.contains(option)
+                                    ) {
+                                        toggle(option, in: &criteria.selectedFavorites)
+                                    }
+                                }
                             }
                         }
                     }

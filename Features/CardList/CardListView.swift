@@ -13,6 +13,8 @@
 //  即座にfilteredCardsへ反映される（シート経由の確定操作は不要）。
 //
 //  カード詳細は下から出るモーダルではなく、その場にふっと浮かび上がる形で表示する。
+//  Q&Aがあるカードは、詳細モーダルの中のQ&Aボタンで、画像が小さくなってQ&Aの一覧に切り替わる。
+//  詳細モーダルの♡ボタンでお気に入りを切り替え、フィルタ画面の「♡」で絞り込める。
 //
 
 import SwiftUI
@@ -33,6 +35,12 @@ struct CardListView: View {
                     LazyVGrid(columns: columns, spacing: 12) {
                         ForEach(viewModel.filteredCards) { card in
                             CardImageCell(card: card)
+                                // お気に入りのカードには、左下に♡の印を付ける
+                                .overlay(alignment: .bottomLeading) {
+                                    if viewModel.isFavorite(card) {
+                                        favoriteMark
+                                    }
+                                }
                                 .onTapGesture {
                                     withAnimation(.easeOut(duration: 0.18)) {
                                         viewModel.selectCard(card)
@@ -57,6 +65,7 @@ struct CardListView: View {
                 .fullScreenCover(isPresented: $viewModel.isSearchSheetPresented) {
                     CardSearchSheet(
                         criteria: viewModel.criteria,
+                        showsFavoriteFilter: true,
                         onSearch: { newCriteria in
                             viewModel.applySearch(newCriteria)
                             viewModel.isSearchSheetPresented = false
@@ -74,18 +83,39 @@ struct CardListView: View {
             // カード詳細: システムのシート/フルスクリーンカバーは使わず、
             // その場にオーバーレイとしてフェード＋拡大で出す（下からのスライドにしない）。
             if let card = viewModel.selectedCard {
-                CardDetailModal(card: card) {
-                    withAnimation(.easeOut(duration: 0.18)) {
-                        viewModel.selectedCard = nil
+                // 画像の下に、♡（お気に入り）ボタンと、Q&Aボタン（Q&Aがあるカードだけ）が出る。
+                // パラレルのQ&Aは、自分の番号に無ければ元のカードのものを使う。
+                CardDetailModal(
+                    card: card,
+                    qaItems: viewModel.qaItems(for: card),
+                    favorite: FavoriteControl(
+                        isFavorite: viewModel.isFavorite(card),
+                        onToggle: { viewModel.toggleFavorite(card) }
+                    ),
+                    onClose: {
+                        withAnimation(.easeOut(duration: 0.18)) {
+                            viewModel.selectedCard = nil
+                        }
                     }
-                }
+                )
                 .transition(.opacity.combined(with: .scale(scale: 0.92)))
                 .zIndex(1)
             }
         }
     }
 
+    /// グリッド上のカード画像の左下に付ける、お気に入りの印
+    private var favoriteMark: some View {
+        Image(systemName: "heart.fill")
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(.pink)
+            .padding(4)
+            .background(.black.opacity(0.6), in: Circle())
+            .padding(3)
+    }
+
     // MARK: - 下部固定フッター（1段目: フィルタボタン、2段目: 検索欄）
+
     private var bottomBar: some View {
         VStack(spacing: 10) {
             HStack {
@@ -139,5 +169,14 @@ struct CardListView: View {
 }
 
 #Preview {
-    CardListView(viewModel: CardListViewModel(repository: MockCardRepository()))
+    CardListView(
+        viewModel: CardListViewModel(
+            repository: MockCardRepository(),
+            qaRepository: MockCardQARepository(),
+            // プレビューでは実際の保存ファイルを触らないよう、一時ファイルを指すストアを使う
+            favoritesStore: FavoritesStore(
+                fileURL: FileManager.default.temporaryDirectory.appendingPathComponent("preview-favorites.json")
+            )
+        )
+    )
 }
