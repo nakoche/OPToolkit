@@ -13,19 +13,11 @@ struct SettingsView: View {
 
     @AppStorage(SettingsStore.Key.colorScheme) private var colorSchemeRawValue: String = AppColorScheme.system.rawValue
     @AppStorage(SettingsStore.Key.enableSoundEffects) private var enableSoundEffects: Bool = true
-    @AppStorage(SettingsStore.Key.defaultSortKey) private var defaultSortKeyRawValue: String = CardSortKey.releaseOrder.rawValue
 
     private var selectedColorScheme: Binding<AppColorScheme> {
         Binding(
             get: { viewModel.colorScheme(from: colorSchemeRawValue) },
             set: { colorSchemeRawValue = $0.rawValue }
-        )
-    }
-
-    private var defaultSortKey: Binding<CardSortKey> {
-        Binding(
-            get: { viewModel.sortKey(from: defaultSortKeyRawValue) },
-            set: { defaultSortKeyRawValue = $0.rawValue }
         )
     }
 
@@ -36,14 +28,6 @@ struct SettingsView: View {
                     Picker("画面モード", selection: selectedColorScheme) {
                         ForEach(AppColorScheme.allCases) { mode in
                             Text(mode.rawValue).tag(mode)
-                        }
-                    }
-                }
-
-                Section("カードリスト") {
-                    Picker("デフォルトの並び順", selection: defaultSortKey) {
-                        ForEach(CardSortKey.allCases) { key in
-                            Text(key.rawValue).tag(key)
                         }
                     }
                 }

@@ -12,12 +12,17 @@ struct RootView: View {
     @AppStorage(SettingsStore.Key.colorScheme) private var colorSchemeRawValue: String = AppColorScheme.system.rawValue
 
     // bodyが再評価されるたびに作り直されないよう、各画面のViewModelはここで1回だけ保持する
-    @State private var cardListViewModel = CardListViewModel()
+    @State private var cardListViewModel: CardListViewModel
     @State private var deckListViewModel: DeckListViewModel
     @State private var soloPlayViewModel: SoloPlayViewModel
     @State private var settingsViewModel = SettingsViewModel()
 
     init() {
+        // お気に入り（♡）の保存先（FavoritesStore）も、アプリで1つだけ作って渡す。
+        // 今はカード画面だけが使うが、他の画面でも使うときに同じものを渡せるよう、ここで作っておく。
+        let favoritesStore = FavoritesStore()
+        _cardListViewModel = State(initialValue: CardListViewModel(favoritesStore: favoritesStore))
+
         // デッキ画面と一人回しが同じ保存先（DeckStore）を見るよう、1つだけ作って渡す。
         // 別々に作ると、デッキ画面で編集した内容が一人回しに反映されなくなる。
         let deckListViewModel = DeckListViewModel()

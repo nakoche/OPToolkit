@@ -7,7 +7,8 @@
 > **確認状況の凡例**
 > - 見出しに**（継承）**とある節は、前回までのREADMEの記述を整理して引き継いだもので、今回の見直しではソースコードを再確認していない。
 > - それ以外の節（一人回し、`Card`／`DeckStore`まわり、`cards.json`の生成など）は、今回までに共有・作成したコードで確認している。
-> - Xcodeでのビルドと動作確認は、ユーザーが行っている（Claudeはビルドできない）。
+> - Xcodeでのビルドと動作確認は、ユーザーが行っている（Claudeはビルドできない）。確認に使っているのは、**iPhone 14 Pro Maxのシミュレーターと実機だけ**。
+- 2026-10-16の更新で追加した内容（パラレル表示切替、公式Q&A、お気に入り、カード詳細モーダルの変更、設定の並び順の削除）は、Claudeが作成したコードを、ユーザーが上記の環境で確認済み。
 
 ---
 
@@ -15,10 +16,10 @@
 
 | 画面 | 内容 | 状態 |
 |---|---|---|
-| ① カードリスト | 検索・絞り込み・並び替え・カード詳細表示 | 実装済み |
+| ① カードリスト | 検索・絞り込み（パラレル表示切替・お気に入り含む）・並び替え・カード詳細表示（公式Q&A・お気に入りボタン） | 実装済み |
 | ② デッキ | 一覧、作成/編集、永続化、QR共有、画像書き出し | 実装済み。対戦履歴画面のみプレースホルダー |
 | ③ 一人回し | カードを自由に動かせるデジタルテーブルトップ（カード効果は反映しない） | 実装済み。BGM・効果音・詳細設定は未実装 |
-| ④ 設定 | 画面モード、デフォルト並び順、効果音トグルなど | 一部のみ反映（7章参照） |
+| ④ 設定 | 画面モード、効果音トグルなど | 画面モードのみ反映。効果音は今後追加（7章参照） |
 
 ---
 
@@ -43,10 +44,11 @@
 
 1. **Kingfisher**: Swift Package Managerで追加済みであること。
 2. **`cards.json`**: アプリのBundleに含める（下記3.2で生成）。**古いと一人回しのライフ数が合わない**（`life`が無いと、全リーダーが5枚で始まる）ので、`Card`に項目を足したときや公式サイトが更新されたときは、再生成して差し替える。
-3. **Info.plist**（追加済み。コードでは自動化できない）: `NSCameraUsageDescription`（QRカメラ読み取り）、`NSPhotoLibraryAddUsageDescription`（デッキ画像の保存）。値が空だと警告が出るので、空でない文言を入れる。
-4. **画像アセット**（`Assets.xcassets`のImage Set）: `CardBack`（カード裏面）、`DonFront`（ドン!!カード表面）、`DonBack`（ドン!!カード裏面）。一人回しで使う。`cards.json`の画像のようにネットから取得せず、アプリに同梱している。
+3. **`qa.json`**（公式Q&A。カード番号 → Q&Aの配列）: アプリのBundleに含める（Xcodeにドラッグして、Target Membershipにチェック）。`cards.json`と同じく`fetch_cards.py`が生成する（3.2）。**無くてもアプリは動く**（Q&Aのボタンが出ないだけ）。
+4. **Info.plist**（追加済み。コードでは自動化できない）: `NSCameraUsageDescription`（QRカメラ読み取り）、`NSPhotoLibraryAddUsageDescription`（デッキ画像の保存）。値が空だと警告が出るので、空でない文言を入れる。
+5. **画像アセット**（`Assets.xcassets`のImage Set）: `CardBack`（カード裏面）、`DonFront`（ドン!!カード表面）、`DonBack`（ドン!!カード裏面）。一人回しで使う。`cards.json`の画像のようにネットから取得せず、アプリに同梱している。
 
-### 3.2 `cards.json`の生成（`Tools/fetch_cards.py`）
+### 3.2 `cards.json`と`qa.json`の生成（`Tools/fetch_cards.py`）
 
 公式カードリスト（`https://www.onepiece-cardgame.com/cardlist/`）をスクレイピングして生成する。初回のみ`pip3 install requests beautifulsoup4`が必要。
 
@@ -56,11 +58,14 @@ python3 fetch_cards.py                   # 全弾を取得（取得済みHTMLは
 python3 fetch_cards.py --offline         # キャッシュ済みHTMLだけで、通信せずに作り直す
 python3 fetch_cards.py --refresh         # キャッシュを無視して再取得
 python3 fetch_cards.py --series 550101   # 特定の弾だけ取得（動作確認用）
+python3 fetch_cards.py --qa-out qa.json   # Q&Aの出力先（既定は qa.json）
 ```
 
-- 出力は`cards.json`（`--out`で変更可）。生成後、Bundleの`cards.json`と差し替える。
+- 出力は`cards.json`（`--out`で変更可）と`qa.json`（`--qa-out`で変更可）。生成後、Bundleの2つのファイルを差し替える。`cards.json`の出力は、Q&A対応の前後で完全に同じ。
 - 実行後のログで、取得枚数、複数色・複数属性の枚数、特徴の分割結果、検出したパック、**リーダーのライフ値の内訳**（「取得できず」が出ていないこと）、スキップ枚数を確認する。
-- 公式サイトのHTML構造が変わった場合は、`parse_cards`と`pack_code_from_label`の修正が必要。
+- ログに、Q&Aのあるカード番号の数（うちパラレル）と、Q&Aの件数も出る。**0件のときは、公式のHTML構造が変わっている可能性が高い**（`parse_qa`を修正）。
+- **新しいQ&A（裁定）を反映するには、`--refresh`でHTMLを取り直す**。`--offline`は、保存済みのHTMLから作り直すだけなので、新しい裁定は入らない。
+- 公式サイトのHTML構造が変わった場合は、`parse_cards`・`parse_qa`・`pack_code_from_label`の修正が必要。
 - **このスクリプトはXcodeのターゲットに追加しない**。アプリに入れるのは`cards.json`だけ。
 
 ### 3.3 ビルド・実行
@@ -74,8 +79,8 @@ Xcodeでビルド・実行する。コマンドラインでのビルド手順は
 ### 4.1 MVVM
 
 - 各画面は`View`と`ViewModel`（`@Observable`クラス）の組。`View`は`@State var viewModel: XxxViewModel`で保持する（`@StateObject`ではない）。
-- データ取得・永続化は`Services/`層。ViewModelは具体的な実装ではなくプロトコル（`CardRepositoryProtocol`、`DeckStoreProtocol`）に依存する。プレビュー用に`MockCardRepository`がある。
-- `RootView`は、`TabView`で4画面をまとめ、**ViewModelを`@State`で1回だけ保持する**（`body`が再評価されるたびに作り直されないように）。`init`で`DeckListViewModel`を作り、その`store`を`SoloPlayViewModel`に渡して、**デッキ画面と一人回しが同じ`DeckStore`を使う**。
+- データ取得・永続化は`Services/`層。ViewModelは具体的な実装ではなくプロトコル（`CardRepositoryProtocol`、`DeckStoreProtocol`、`CardQARepositoryProtocol`）に依存する。プレビュー用に`MockCardRepository`、`MockCardQARepository`がある。`FavoritesStore`だけは、プロトコルを用意していない具体クラス。
+- `RootView`は、`TabView`で4画面をまとめ、**ViewModelを`@State`で1回だけ保持する**（`body`が再評価されるたびに作り直されないように）。`init`で`DeckListViewModel`を作り、その`store`を`SoloPlayViewModel`に渡して、**デッキ画面と一人回しが同じ`DeckStore`を使う**。同じ`init`で`FavoritesStore`も1つだけ作り、`CardListViewModel`に渡す（お気に入りの保存先をアプリ全体で共有するため）。
 - `Models/`は、データ構造と、その値だけで決まる計算を置く。画面やI/Oには依存させない。
 
 ### 4.2 ディレクトリ構成
@@ -90,6 +95,7 @@ OPToolkit/
 ├── Models/
 │   ├── Card.swift                // Card と列挙型（色・種類・属性・レアリティ・ブロックアイコン）
 │   ├── Card+ReleaseSort.swift    // カードリストの発売順の比較（CardReleaseOrder）
+│   ├── CardQA.swift              // 公式Q&A 1件（qa.jsonの1項目）。nonisolated struct
 │   ├── Deck.swift                // Deck, DeckEntry, デッキ集計
 │   ├── AppSettings.swift         // AppColorScheme, CardSortKey, SortDirection
 │   ├── CardInstance.swift        // 【一人回し】盤面上のカード1枚（UUID・レスト・付与ドン・パワー/コストの増減）
@@ -98,9 +104,11 @@ OPToolkit/
 │
 ├── Services/
 │   ├── CardRepository.swift      // cards.jsonの読み込み
+│   ├── CardQARepository.swift    // qa.jsonの読み込み（無ければ空）。MockCardQARepositoryもここ
 │   ├── ImageHost.swift           // カード画像URLの組み立て（公式サイトを直接参照）
 │   ├── ImageCacheConfig.swift    // Kingfisherのキャッシュ設定
 │   ├── DeckStore.swift           // デッキの永続化（JSON）
+│   ├── FavoritesStore.swift      // お気に入り（♡）の永続化（favorites.json）。@Observable
 │   ├── StoredDeck.swift          // デッキの保存形式（カード番号＋枚数）
 │   ├── SettingsStore.swift       // @AppStorageのキーを集約
 │   ├── QRCodeService.swift       // QR画像の生成
@@ -108,7 +116,7 @@ OPToolkit/
 │   └── QRImageDecoder.swift      // 写真に写ったQRの読み取り
 │
 ├── Features/
-│   ├── CardList/                 // ① CardListView/ViewModel, CardSearchSheet, CardSearchCriteria, CardDetailModal
+│   ├── CardList/                 // ① CardListView/ViewModel, CardSearchSheet, CardSearchCriteria, CardDetailModal（FavoriteControlもここ）
 │   ├── DeckList/                 // ② DeckListView/ViewModel, 画像書き出し, QRScannerView, BattleHistoryView(空)
 │   ├── DeckDetail/               // ② デッキ詳細・リーダー選択・デッキカード選択・枚数モーダル
 │   ├── SoloPlay/                 // ③ 一人回し（5.4参照）
@@ -121,12 +129,14 @@ OPToolkit/
 │   └── Settings/                 // ④ SettingsView/ViewModel
 │
 └── Shared/
-    ├── Components/               // CardThumbnailImage, CardBackImage, FilterChip, ShareSheet, BackSwipeInterceptor
+    ├── Components/               // CardThumbnailImage, CardBackImage, FilterChip, ParallelModeButton, ShareSheet, BackSwipeInterceptor
     └── Extensions/               // String+Search（ひらがな/カタカナを区別しない検索）
 
 Tools/                            // Xcodeターゲットに含めない
 └── fetch_cards.py
 ```
+
+`ParallelDisplayMode`（パラレル表示の3状態）は、リーダー選択のViewModel（`LeaderSelectViewModel.swift`）に定義されていて、カードリスト・デッキカード選択からも使っている（共通の置き場所への移動は未実施）。
 
 規則: 各`Features/<画面名>/`の直下に`<画面名>View.swift`と`<画面名>ViewModel.swift`、その画面専用の小さなViewは`Components/`に置く。
 
@@ -134,7 +144,7 @@ Tools/                            // Xcodeターゲットに含めない
 
 Default Actor IsolationがMainActorだと、型や`static`メンバーが暗黙にMainActorになる。次のような型には、明示的に`nonisolated`を付けている。
 
-- バックグラウンドで使う処理（`QRImageDecoder`の各メソッド、`Card`の`init(from:)`/`encode(to:)`）
+- バックグラウンドで使う処理（`QRImageDecoder`の各メソッド、`Card`の`init(from:)`/`encode(to:)`、`CardQA`（型ごと`nonisolated struct`。`Task.detached`の中でデコードするため））
 - MainActor外の文脈で`==`や`Codable`が必要な型（`Perspective`、`SoloPlayError`、ドラッグの中身の`DonSource`・`SoloDragContent`・`SoloDragItem`）
 
 ---
@@ -145,11 +155,11 @@ Default Actor IsolationがMainActorだと、型や`static`メンバーが暗黙�
 
 ```
 RootView (TabView)
-├─ CardListView … CardDetailModal（オーバーレイ） / CardSearchSheet（fullScreenCover）
+├─ CardListView … CardDetailModal（オーバーレイ。♡・Q&A） / CardSearchSheet（fullScreenCover。♡フィルタあり）
 ├─ DeckListView
 │   ├─ DeckDetailView（push。タブバー非表示、標準の戻るボタンは非表示）
 │   │   ├─ LeaderSelectView（fullScreenCover。新規作成時のみ）
-│   │   └─ DeckCardSelectView（fullScreenCover）… CardQuantityModal / CardSearchSheet（色固定）
+│   │   └─ DeckCardSelectView（fullScreenCover）… CardQuantityModal / CardSearchSheet（色固定。♡フィルタなし）
 │   ├─ BattleHistoryView（push。プレースホルダー）
 │   ├─ QRScannerView（fullScreenCover。「画像から」/「カメラ」）
 │   └─ DeckImagePreviewModal（オーバーレイ）
@@ -159,10 +169,39 @@ RootView (TabView)
 
 ### 5.2 ① カードリスト（`Features/CardList/`）
 
-- 1行5枚の`LazyVGrid`。下部の固定フッターに、カード名・番号の検索欄とフィルタボタン。
-- 検索条件は`CardSearchCriteria`（色・種類・特徴・コスト・パワー・属性・カウンター・レアリティ・ブロックアイコン・並び替え）に集約。`CardSearchSheet`（`fullScreenCover`）で編集する。色・属性の複数選択は**OR**（どれか1つ持っていればよい）。`lockedColors`を渡すと、色フィルタを固定できる（デッキカード選択で使用）。
+- 1行5枚の`LazyVGrid`。下部の固定フッター（`safeAreaInset`）の1段目にフィルタボタン、2段目にカード名・番号の検索欄と、その右の**パラレル表示切替ボタン**（`ParallelModeButton`、直径40pt）。
+- **パラレル表示切替**: 星アイコンのボタン。タップするたびに「ノーマルのみ（`star`）→ 混在（`star.leadinghalf.filled`）→ パラレルのみ（`star.fill`）」と循環する。状態は`CardListViewModel.parallelMode`で、`CardSearchCriteria`とは別に持つ（検索シートで「検索」を押しても変わらない）。初期状態は混在。並び替え済みの結果にあとから絞るので、並び順は変わらない。リーダー選択・デッキカード選択も、同じ`ParallelModeButton`と`ParallelDisplayMode`を使う。
+- **グリッド上の♡の印**: お気に入りのカードは、カード画像の左下に、黒い丸地にピンクの♡を重ねる。
+- 検索条件は`CardSearchCriteria`（色・♡・種類・特徴・コスト・パワー・属性・カウンター・レアリティ・ブロックアイコン・並び替え）に集約。`CardSearchSheet`（`fullScreenCover`）で編集する。色・属性の複数選択は**OR**（どれか1つ持っていればよい）。`lockedColors`を渡すと、色フィルタを固定できる（デッキカード選択で使用）。
 - **デフォルトの表示順は「発売順」**（`CardSortKey.releaseOrder`）。優先順位は、①弾の種類（`OP`→`EB`→`PRB`→`ST`→その他）、②同じ種類の中では番号が新しい弾が先、③同じ弾の中ではオリジナルが先で再録は末尾、④番号順、⑤ノーマルが先でパラレルが後、⑥パラレル同士はレアリティが低い方が先。単純な1キー比較にできないため、`CardReleaseOrder`の専用比較で行う。
-- カードをタップすると、`CardDetailModal`（画像だけを大きく見せるライトボックス）を出す。**背景のタップ**か、**上下左右へのドラッグ**（一定距離を超える）で閉じる。×ボタンは無い。呼び出し側が`accessory`を渡すと、画像の下に部品を並べられる（一人回しで使う）。
+- **♡のフィルタ**: `CardSearchSheet`の「色」と「コスト」の間に、見出し「♡」で「お気に入り」「お気に入り以外」の2ボタン（`FavoriteOption`、`CardSearchCriteria.selectedFavorites`）。どちらも選ばない場合と、両方選んだ場合は、絞り込まない。`showsFavoriteFilter: true`を渡したときだけ出す（カードリストだけ。デッキカード選択では出さない）。判定に使うお気に入りのカード番号は、`CardSearchCriteria.apply(to:favoriteCardNumbers:)`で渡す（省略時は空）。
+- カードをタップすると、`CardDetailModal`（画像を大きく見せるライトボックス）を出す。**背景のタップ**か、**上下左右へのドラッグ**（一定距離を超える）で閉じる。×ボタンは無い。呼び出し側が`accessory`を渡すと、画像の下に部品を並べられる（一人回しで使う）。カードリストからは、さらに♡ボタンとQ&Aボタンが出る（下記）。
+
+#### カード詳細モーダル（`CardDetailModal`）の仕様
+
+- **引数**: `card`、`qaItems`（既定は空）、`favorite`（`FavoriteControl`。既定は`nil`）、`onClose`、`accessory`（既定は`EmptyView`）。`FavoriteControl`は、♡の状態（`isFavorite`）と、押したときの動作（`onToggle`）をまとめた型で、`CardDetailModal.swift`にある。**`qaItems`も`favorite`も渡さなければ（一人回し）、ボタンは出ず、従来と同じ見た目・動作**。
+- **ボタン（アクション行）**: 画像の下に、縦に、上から♡、Q&A。♡は60pt（アイコン28pt。お気に入りのときは塗りつぶしのピンク、軽い触覚つき）、Q&Aはカプセル型（高さ40pt、「Q&A（件数）」）。**Q&Aが無いカードは、Q&Aボタンを出さない**（♡は常に出る）。
+- **♡の位置**: 画像とQ&Aボタンの真ん中。♡の上下の余白は同じ16pt。**Q&Aが無いカードでも、Q&Aボタンの分（40pt）の空きを取っておく**（♡の位置がカードによってずれないように）。
+- **画像の位置**: 画像とボタンをまとめて中央に置くと、画像がボタンの分だけ上にずれる。そこで、画像の上に、ボタン部分と同じ高さ（＋間隔）の余白を足して、画像を元の位置（画面の中央）に保つ（`imageTopPadding`）。この余白は、タップ・ドラッグの範囲には含まれない。Q&Aを開いている間は0。
+- **Q&Aの開閉**: Q&Aボタンを押すと、同じモーダルの中で、画像が小さくなって上に寄り（高さの上限は、モーダルの領域の高さの3割）、♡が消えて（高さも余白も0）、下にQ&A一覧が出る。もう一度Q&Aボタンを押すか、小さくなった画像をタップすると戻る。閉じる操作（背景タップ、ドラッグ）は、開いている間も有効。ドラッグは画像にだけ付けているので、一覧のスクロールとは競合しない。
+- **Q&A一覧**: 全文を出す。1件ごとに、Q番号、更新日（例: `2026.08.21更新`）、Q、A。高さは中身の高さで、上限は領域の高さの4.5割（超えたら一覧の中だけスクロール）。閉じている間は、高さ0・透明・タップ不可にして、階層には残す（アニメーションを滑らかにするため。高さを数値で制御している）。
+- **領域の高さの測り方**: `onGeometryChange`で、モーダルの`ZStack`の高さを測る（`containerHeight`。測れるまでは0で、画像の高さを制限しない）。**`GeometryReader`で全体を包まない**（中身が左上基準に置かれて、一人回しのパネル付きの表示が右にずれた）。
+- 今後ボタンを足すときは、`actionBar`の`VStack`に並べる（`collapsedActionHeight`の計算も合わせて直す）。
+
+#### 公式Q&A（`qa.json`）
+
+- **データ**: カード番号をキーにした、Q&Aの配列の辞書。`Card`には持たせない（`Card`に項目を足すと、`Codable`・`fetch_cards.py`・`cards.json`の再生成が連動するため）。`{ "OP17-001": [ { "id": "Q1417", "date": "2026-08-21", "question": "...", "answer": "..." } ], ... }`（`date`は無いこともある）。
+- **型と読み込み**: `CardQA`（`Models/`。`id`は公式のQ番号）と、`CardQARepository`（`Services/`。Bundleの`qa.json`を`Task.detached`で読む。**ファイルが無ければ空の辞書を返す**。壊れていれば例外）。
+- **`CardListViewModel`**: `loadCards()`の中で、カードとは別にQ&Aを読む（Q&Aが読めなくても、カード一覧は表示される）。一度読めたら、再読み込みしない。`qaItems(for:)`がそのカードのQ&Aを返す。**パラレル（`_p1`など）は、自分の番号にQ&Aが無ければ、元のカード番号のQ&Aを使う**。
+- **生成（`fetch_cards.py`の`parse_qa`）**: 公式のHTMLでは、カード1枚の`dl.modalCol`の中の`dd.cardFaqWrap`に、Q&A 1件ごとの`div.cardFaqCol`があり、`h5.cardFaqNum`（Q番号）、`time[datetime]`（更新日）、`dt.cardFaqDataQ`（質問）、`dd.cardFaqDataA`（回答。`<br>`は改行にする）を持つ。同じカード番号が複数の弾のページに出るので、Q番号で重複を除いて集める。公式のページでは、パラレルのカードにも、元と同じQ&Aが載っている。
+- **確認した内容**: 1ページ分のHTMLで試したとき、169カード中65カードにQ&Aがあった（1枚あたり1〜3件）。
+
+#### お気に入り（♡）
+
+- **単位**: カード番号。**ノーマルとパラレルは別々に**お気に入りにできる。
+- **保存**: `FavoritesStore`（`Services/`）。`Application Support/OPToolkit/favorites.json`に、`{ "version": 1, "cardNumbers": [...] }`の形式。`@Observable`クラスで、`cardNumbers`を読んでいる画面は、♡の切り替えで自動で更新される。`init`で同期的に読む。壊れていたら`favorites.corrupt.json`に退避して、空で始める。**書き込みに失敗しても、メモリ上の状態は更新したまま**（ログに出すだけで、画面にエラーは出さない）。
+- **共有**: `RootView`の`init`で1つだけ作って、`CardListViewModel`に渡す（`DeckStore`と同じ考え方）。他の画面で使うときも、同じインスタンスを渡す。プレビューでは、一時ファイルを指すストアを使う。
+- **`CardListViewModel`の窓口**: `isFavorite(_:)`、`toggleFavorite(_:)`。`filteredCards`は、♡のフィルタのために、`favoritesStore.cardNumbers`を渡している。
 
 ### 5.3 ② デッキ（継承。`DeckStore`・`StoredDeck`は確認済み）
 
@@ -175,8 +214,8 @@ RootView (TabView)
 
 #### 詳細・カード選択（`Features/DeckDetail/`）
 - `DeckDetailView`: デッキ名、リーダー、デッキカード、デッキ情報、コスト別の棒グラフ、特徴別の枚数、メモ。保存ボタンは下に浮かせる。デッキ名・リーダー・カード・メモのいずれかが保存時点から変わっているときは、戻る操作（自前の戻るボタンと、左端スワイプの`BackSwipeInterceptor`）で確認を出す。
-- `LeaderSelectView`: リーダーだけのグリッド。タップで即選択。パラレル表示は3状態（ノーマルのみ／混在／パラレルのみ）。
-- `DeckCardSelectView`: **タップで+1、長押し（0.4秒）で`CardQuantityModal`（枚数指定）、画面上部の追加済みサムネイルのタップで-1**。同じカード番号は`Deck.maxCopiesPerCard`（4）まで。色フィルタはリーダーの色に固定（2色リーダーなら、どちらかの色を持つカード）。「完了」ボタンとフィルタボタンは、カード一覧の上に浮かせる。
+- `LeaderSelectView`: リーダーだけのグリッド。タップで即選択。パラレル表示は3状態（ノーマルのみ／混在／パラレルのみ）。切替ボタンは共通の`ParallelModeButton`（直径36pt）。
+- `DeckCardSelectView`: **タップで+1、長押し（0.4秒）で`CardQuantityModal`（枚数指定）、画面上部の追加済みサムネイルのタップで-1**。同じカード番号は`Deck.maxCopiesPerCard`（4）まで。色フィルタはリーダーの色に固定（2色リーダーなら、どちらかの色を持つカード）。「完了」ボタンは下の中央に、右端にはボタンが縦に2つ並ぶ（上がフィルタ、**下がパラレル表示切替**。どちらも56pt）。パラレルの状態は`DeckCardSelectViewModel.parallelMode`（初期は混在。フィルタシートの条件とは別で、並び替え済みの結果にあとから絞る）。右端のボタンが2つになったので、スクロール末尾の余白（`contentMargins`）も広げている。フィルタシート（色固定）には、♡のフィルタは出さない。
 
 #### 永続化（`DeckStore`）
 - 保存先は`Application Support/OPToolkit/decks.json`。形式は`{ "version": 1, "decks": [...] }`で、**`Card`の実体は保存せず、カード番号＋枚数（`StoredDeck`）だけ**を保存する。`Card`にフィールドを足しても、保存済みデッキが読めなくなったり、`cards.json`の更新が反映されなくなったりしないため。
@@ -273,7 +312,7 @@ RootView (TabView)
 
 ### 5.5 ④ 設定（継承）
 
-画面モード（ライト/ダーク/システム）、カードリストのデフォルト並び順、一人回しの効果音トグル、バージョン表示、プライバシーポリシー/利用規約リンク（ダミーURL）。画面モードは`RootView`が`.preferredColorScheme`で全体に反映する。**並び順の設定と効果音の設定は、まだ使われていない**（7章）。
+画面モード（ライト/ダーク/システム）、一人回しの効果音トグル、バージョン表示、プライバシーポリシー/利用規約リンク（ダミーURL）。画面モードは`RootView`が`.preferredColorScheme`で全体に反映する。**効果音の設定は、まだ使われていない**（今後、効果音を追加するときに使う）。「デフォルトの並び順」は、**不要と判断して、設定画面から削除した**。`SettingsStore.Key.defaultSortKey`と`SettingsViewModel.sortKey(from:)`は、使われないまま残っている可能性がある（ソース未確認。不要なら削除してよい）。
 
 ---
 
@@ -289,6 +328,11 @@ RootView (TabView)
 - **デッキ一覧の並び替えは、独自の`DragGesture`による隣接入れ替え**。「＝」ハンドルだけを起点にしたいという要件のため。
 - **デッキカード選択は、タップで+1、長押しでモーダル、上部サムネイルのタップで-1**。「タップするたびに循環する」方式は、4枚の次のタップでカードが消える事故が起きやすいので採らなかった。追加できたときだけ軽く振動する（できないときは何もしない）。
 - **同じカードの上限は`Deck.maxCopiesPerCard`（4）**。50枚の上限は、デッキの保存では検証していない（表示のみ）。一人回しでは、50枚のデッキだけ選べる。
+- **Q&Aは`Card`に入れず、別ファイル`qa.json`に持つ**。`Card`に項目を足すと、`Codable`・`fetch_cards.py`・`cards.json`の再生成が連動するため。更新は、アプリ内で取得せず、`fetch_cards.py`の再実行で行う。
+- **Q&Aは、新しい画面にも、2枚目のモーダルにもせず、カード詳細モーダルの中で切り替える**。画面遷移を避けたいという方針と、モーダルを重ねると閉じる操作・ドラッグの判定が二重になるため。
+- **♡・Q&Aのボタンは、呼び出し側が`favorite`/`qaItems`を渡したときだけ出す**。同じ`CardDetailModal`を使う一人回しの表示を変えないため。
+- **お気に入りは、ノーマルとパラレルを別々に扱う**（カード番号で保存）。
+- **パラレル表示切替は、`CardSearchCriteria`に入れず、各ViewModelに持たせる**。`criteria`を共用するデッキカード選択に影響させないためと、検索シートの「検索」で状態が変わらないようにするため。♡のフィルタは、出したい画面だけ`showsFavoriteFilter`で出す。
 
 ---
 
@@ -303,11 +347,22 @@ RootView (TabView)
 - 一人回しのロジック（`PlayerBoard`の移動ルール、ライフ配置など）の自動テストは、ない。
 
 ### 設定画面
-- **`CardListViewModel`は`CardSearchCriteria()`をそのまま使い、`SettingsStore.Key.defaultSortKey`を読んでいない**（確認済み）。設定の「デフォルトの並び順」は、カードリストに反映されない。
-- 継承: `SettingsView`の`@AppStorage`の初期値と`SettingsViewModel.sortKey(from:)`のフォールバックが`.name`で、実際のデフォルト（`.releaseOrder`）と食い違っている。今回は未確認。
+- 効果音のトグル（`enableSoundEffects`）は、まだどこからも使われていない（効果音の実装時に使う）。
+- 「デフォルトの並び順」の設定は削除した（不要と判断）。関連する`SettingsStore.Key.defaultSortKey`と`SettingsViewModel.sortKey(from:)`が、未使用のまま残っている可能性がある（未確認）。
+
+### カードリスト・Q&A・お気に入り（2026-10-16追加分）
+- 新しいQ&A（裁定）は、自動では入らない。`fetch_cards.py --refresh`で再生成して、Bundleの`qa.json`を差し替える必要がある。
+- お気に入りの保存に失敗しても、画面には出ない（ログのみ）。
+- デッキカード選択のフィルタには、♡のフィルタが無い。デッキ画面にも、♡の印は無い。
+- カード詳細モーダルの寸法（画像の高さ上限は領域の3割、Q&A一覧の上限は4.5割、♡60pt、余白16pt、Q&Aボタン40pt）は、iPhone 14 Pro Maxで調整した値。**小さい画面（iPhone SEなど）やiPadでは未確認**。ボタンの高さ分だけ、画像が小さくなる可能性がある。
+- `ParallelDisplayMode`が、リーダー選択のViewModelのファイルに定義されている（共通の置き場所への移動は未実施）。
+
+### 開発時に出る既知のログ（アプリの不具合ではない）
+- `FontParser could not open ... AppleColorEmoji.ttc`: シミュレーターのiOS 26.3ランタイムの既知の不具合（絵文字のフォントを開けない）。実機では出ない。iOS 26.4以降のシミュレーターで直ったと報告されている。
+- `Failed to send CA Event for app launch measurements ...`（`FirstFramePresentationMetric`、`ExtendedLaunchMetrics`）: OSの起動時間の計測のログ。他のプロジェクトでも出る。動作に影響しない。
 
 ### デッキ・カード（継承。今回は未再確認）
-- リーダーを変更しても、追加済みの別色のカードが残る（`DeckDetailViewModel.setLeader`が整理しない）。
+- リーダーを変更しても、追加済みの別色のカードが残る（`DeckDetailViewModel.setLeader`が整理しない。確認済み）。運用上起きづらいため、**放置でよいと判断している**。
 - ノーマルとパラレルは別カード番号なので、別カードとして数えられる（同名が、ノーマル4枚＋パラレル4枚で入る）。
 - 種類の多いデッキのQRが、画像や写真から読み取れる大きさかは未検証。
 - 画像の書き出しが失敗しても、画面上は何も起きない。画像プレビューは、`shareImage`への代入に`withAnimation`が無く、`.transition(.opacity)`が効かない。画像書き出し時のカード画像の取得は直列。
@@ -319,8 +374,8 @@ RootView (TabView)
 ### データ・外部依存
 - **カード画像とカードデータは、公式サイトのHTML構造・画像URLに依存している**。変更されると、画像が一斉に表示されなくなったり、`fetch_cards.py`が失敗したりする（`ImageHost.baseURL`と`parse_cards`を修正）。
 - `fetch_cards.py`の`packCode`は、絞り込みの表示名が`【XX-NN】`形式であることに依存する。この形式がないページ（ファミリーデッキセット・プロモーション・限定商品）は`packCode`が`nil`になり、再録とは扱われない。
-- 公式のQ&A情報、効果テキストは、`cards.json`に保存していない（効果テキストは、ブロッカー/トリガーの判定にだけ使用）。
-- `CardListViewModel`の読み込みエラーは、`print`のみでViewに伝わらない（TODOコメントあり）。
+- 公式のQ&Aは、`qa.json`に保存している（`cards.json`には入れない）。効果テキストは保存していない（ブロッカー/トリガーの判定にだけ使用）。
+- `CardListViewModel`の読み込みエラーは、`print`のみでViewに伝わらない（TODOコメントあり）。**この仕様のままでよいと判断している**。Q&Aの読み込みエラーも同じ扱い。
 
 ---
 
@@ -328,8 +383,10 @@ RootView (TabView)
 
 - **一人回しのBGM・効果音**: 動作の実装が完了したあとに検討する（音源は未用意）。
 - **一人回しの詳細設定**: 設定タブ内の機能として実装する予定（項目は未定）。
-- **設定画面の対応**: デッキ・一人回しの実装後に行うとしていた作業で、未着手（7章の並び順の反映を含む）。
-- **対戦履歴**: 記録する内容が未決定。
+- **設定画面の対応**: 一人回しの効果音のトグルを、効果音の実装時に反映する。並び順の設定は、不要と判断して削除済み。
+- **対戦履歴**: このREADMEの更新後に実装する予定。記録する内容は未決定。
+- **デッキカード選択のフィルタへの♡の追加**（候補）: `showsFavoriteFilter: true`を渡し、`DeckCardSelectViewModel`に`FavoritesStore`を渡す。デッキ詳細・デッキ一覧を通して、ストアを渡す経路が必要。
+- **別端末での動作確認・運用**（将来）: 今はiPhone 14 Pro Maxだけで確認している。小さい画面（iPhone SE等）・iPadでの表示確認（特に、カード詳細モーダルと一人回しの盤面）。
 
 ---
 
@@ -350,15 +407,31 @@ RootView (TabView)
 13. **Simulatorで「スクロールが一瞬止まる」のは、実装のバグではなく、Simulatorの描画負荷だったことがある**。まず、実機・Releaseビルドで確認する。
 14. **`Tools/fetch_cards.py`は、Xcodeのターゲットに追加しない**。
 15. コード内のコメントは日本語で、「なぜその実装にしたか」を書く。View/ViewModelは`<画面名>View.swift`/`<画面名>ViewModel.swift`、プロトコルは`〜Protocol`、モック実装は`Mock〜`と名付ける。
-16. **Claude向け**: Claudeはビルドできない。コンパイルエラーや警告は、ユーザーがXcodeで確認して報告する。
+16. **`CardDetailModal`の♡・Q&Aのボタンは、`favorite`/`qaItems`を渡したときだけ出る**。一人回し（`SoloPlayView`・`SoloMulliganView`）は渡さないので従来どおり。引数を足すときは、`onClose`/`accessory`より前に、既定値付きで足す（`CardDetailModal(card:) { ... }`のようなトレーリングクロージャの呼び出しを壊さないため）。
+17. **`CardDetailModal`を`GeometryReader`で包まない**。中身が左上基準に置かれて、一人回しのパネル付きの表示が右にずれた。大きさは`onGeometryChange`で測る。
+18. **`FavoritesStore`は、`RootView`で1つだけ作って共有する**（実アプリでは、`CardListViewModel`の`favoritesStore`引数にデフォルトに頼らず、`RootView`から渡す）。お気に入りの状態を表示する画面は、`cardNumbers`をbodyの中で読む（`@Observable`なので、自動で更新される）。
+19. **`qa.json`は、`cards.json`と同じ手順で再生成して、Bundleに入れる**（3.2）。Bundleでのファイル名は`qa.json`（`CardQARepository`が`qa`という名前で探す）。
+20. **`CardSearchCriteria.apply(to:favoriteCardNumbers:)`**: ♡のフィルタを使う画面は、お気に入りのカード番号を渡す。渡さない画面（デッキカード選択）では、♡のフィルタは選ばれない。
+21. **Claude向け**: Claudeはビルドできない。コンパイルエラーや警告は、ユーザーがXcodeで確認して報告する。
 
 ---
 
 ## 10. 確認できていない事項
 
-- **今回の見直しで、ソースを直接確認していないファイル**: `OPToolkitApp.swift`、`ImageHost.swift`、`ImageCacheConfig.swift`（`configure()`が起動時に呼ばれているか）、`Card+ReleaseSort.swift`（一人回しのトラッシュパネルは、`CardReleaseOrder.sorted(_:direction:)`の呼び出し形を、`CardSearchCriteria`の使い方から推測して使っている）、`CardRepository.swift`、`SettingsView`/`SettingsViewModel`、`DeckDetail`・`DeckList`配下のほとんど、`String+Search.swift`、`CardRow.swift`。
+- **今回の見直しで、ソースを直接確認していないファイル**: `OPToolkitApp.swift`、`ImageHost.swift`、`ImageCacheConfig.swift`（`configure()`が起動時に呼ばれているか）、`Card+ReleaseSort.swift`（一人回しのトラッシュパネルは、`CardReleaseOrder.sorted(_:direction:)`の呼び出し形を、`CardSearchCriteria`の使い方から推測して使っている）、`CardRepository.swift`、`SettingsViewModel`/`SettingsStore`、`DeckList`配下、`DeckDetail`配下のうち`DeckDetailView`・`DeckDetailViewModel`・`LeaderSelectView`・`LeaderSelectViewModel`・`DeckCardSelectView`・`DeckCardSelectViewModel`以外、`String+Search.swift`、`CardRow.swift`。なお、`SettingsView`、`CardSearchSheet`、`CardSearchCriteria`、`CardListView`、`CardListViewModel`、`CardDetailModal`、`FilterChip`、`RootView`は、2026-10-16の更新で内容を確認した。
 - **Xcodeのビルド設定**: Deployment Target、Swiftの言語モード、Default Actor Isolation。
 - **未使用の可能性があるもの**: `DeckCreationView`、`ShareSheet`、`DeckListViewModel.move(fromOffsets:)`、`CardRow.swift`。
-- **動作確認の範囲**: 一人回しの各機能は、ユーザーがXcodeで確認済み。使用した機種やシミュレーター、iPadでの確認の有無は不明。
+- **動作確認の範囲**: 動作確認は、**iPhone 14 Pro Maxのシミュレーターと実機だけ**（ユーザーがXcodeで実施）。一人回しの各機能、パラレル表示切替、Q&A、お気に入り、カード詳細モーダルの表示は、この環境で確認済み。別の機種、小さい画面、iPadでの確認は、していない（将来、行う予定）。
 - **`cards.json`の最新の枚数・スキップ枚数**（リーダーのライフ値は、2〜6の範囲で取得できたとの報告のみ）。
 - 対象ユーザーの要件（OPTCGのプレイヤーを想定しているが、明文化された要件は無い）。
+
+---
+
+## 11. 更新履歴
+
+- **2026-10-16**
+  - カードリストに、パラレル表示切替（検索欄の右）を追加。デッキカード選択にも追加（フィルタボタンの下）。リーダー選択のボタンは、共通の`ParallelModeButton`に置き換え。
+  - 公式Q&Aを追加（`qa.json`、`CardQA`、`CardQARepository`。`fetch_cards.py`に`parse_qa`を追加）。カード詳細モーダルの中で、画像が小さくなってQ&A一覧に切り替わる形。
+  - お気に入り（♡）を追加（`FavoritesStore`、`FavoriteControl`）。カード詳細モーダルの♡ボタン、フィルタ画面の「♡」、グリッド上の♡の印。
+  - カード詳細モーダルの画像位置・♡の位置を調整。一人回しの表示ずれ（`GeometryReader`が原因）を修正。
+  - 設定の「デフォルトの並び順」を削除。
