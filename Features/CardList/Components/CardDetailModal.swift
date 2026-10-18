@@ -46,6 +46,8 @@ struct CardDetailModal<Accessory: View>: View {
     @State private var isQAExpanded = false
     /// Q&A一覧の中身の高さ。Q&Aが短いときに、一覧の枠が余らないように測っておく
     @State private var qaContentHeight: CGFloat = 0
+    /// このモーダルが置かれている領域の高さ。画像とQ&A一覧の高さを、画面に対する割合で決めるために測る（測れるまでは0）
+    @State private var containerHeight: CGFloat = 0
     /// これ以上ドラッグしたら閉じる、とみなす距離（pt）
     private let dismissThreshold: CGFloat = 120
 
@@ -68,39 +70,43 @@ struct CardDetailModal<Accessory: View>: View {
     private var hasActions: Bool { hasQA || favorite != nil }
 
     var body: some View {
-        // 画像とQ&A一覧の高さを、画面の高さに対する割合で決めるために、全体の大きさを測る
-        GeometryReader { proxy in
-            ZStack {
-                Color.black.opacity(0.85 * backgroundOpacityRatio)
-                    .ignoresSafeArea()
-                    .onTapGesture(perform: onClose)   // 背景タップでも閉じられるようにしておく
+        // 全体をGeometryReaderで包むと、中身が左上基準に置かれて、一人回しのパネル付きの表示が右にずれてしまう。
+        // そのため、これまでと同じ ZStack のまま、大きさだけを onGeometryChange で測る。
+        ZStack {
+            Color.black.opacity(0.85 * backgroundOpacityRatio)
+                .ignoresSafeArea()
+                .onTapGesture(perform: onClose)   // 背景タップでも閉じられるようにしておく
 
-                VStack(spacing: contentSpacing) {
-                    Spacer(minLength: 0)
+            VStack(spacing: contentSpacing) {
+                Spacer(minLength: 0)
 
-                    cardImage
-                        .padding(.horizontal, 32)
-                        .frame(maxHeight: imageMaxHeight(in: proxy.size.height))
-                        .offset(dragOffset)
-                        .gesture(dragToDismissGesture)
-                        // Q&Aを開いている間は、小さくなった画像をタップして元に戻せる（閉じているときは何もしない）
-                        .onTapGesture {
-                            if isQAExpanded { toggleQA() }
-                        }
-                        // ボタンの分だけ画像が上にずれないよう、上にも同じ高さの余白を足す（タップ・ドラッグの範囲には含まれない）
-                        .padding(.top, imageTopPadding)
-
-                    // ♡もQ&Aも無ければ、ここには何も出ない
-                    if hasActions {
-                        actionSection(screenHeight: proxy.size.height)
+                cardImage
+                    .padding(.horizontal, 32)
+                    .frame(maxHeight: imageMaxHeight(in: containerHeight))
+                    .offset(dragOffset)
+                    .gesture(dragToDismissGesture)
+                    // Q&Aを開いている間は、小さくなった画像をタップして元に戻せる（閉じているときは何もしない）
+                    .onTapGesture {
+                        if isQAExpanded { toggleQA() }
                     }
+                    // ボタンの分だけ画像が上にずれないよう、上にも同じ高さの余白を足す（タップ・ドラッグの範囲には含まれない）
+                    .padding(.top, imageTopPadding)
 
-                    // 何も渡されていなければ、ここには何も出ない
-                    accessory
-
-                    Spacer(minLength: 0)
+                // ♡もQ&Aも無ければ、ここには何も出ない
+                if hasActions {
+                    actionSection(screenHeight: containerHeight)
                 }
+
+                // 何も渡されていなければ、ここには何も出ない
+                accessory
+
+                Spacer(minLength: 0)
             }
+        }
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.height
+        } action: { newHeight in
+            containerHeight = newHeight
         }
     }
 
@@ -130,7 +136,7 @@ struct CardDetailModal<Accessory: View>: View {
     /// ボタンがあるときは、閉じている間は画面の高さ（実質、制限なし）、開いている間は画面の3割。
     /// どちらも数値にしているのは、開閉のアニメーションで、画像の大きさが滑らかに変わるようにするため。
     private func imageMaxHeight(in screenHeight: CGFloat) -> CGFloat? {
-        guard hasActions else { return nil }
+        guard hasActions, screenHeight > 0 else { return nil }
         return isQAExpanded ? screenHeight * 0.30 : screenHeight
     }
 
