@@ -28,16 +28,24 @@ final class DeckListViewModel {
 
     private let deckStore: DeckStoreProtocol
     private let cardRepository: CardRepositoryProtocol
+    private let battleHistoryStore: BattleHistoryStore
 
     /// DeckDetailViewModelに同じ保存先を渡すために公開しておく
     var store: DeckStoreProtocol { deckStore }
 
+    /// 対戦履歴画面に同じ保存先を渡すために公開しておく
+    var historyStore: BattleHistoryStore { battleHistoryStore }
+
+    /// battleHistoryStoreは、アプリで1つだけ作って共有するため、デフォルト値を持たない必須引数にしている
+    /// （画面ごとに作ると、履歴の保存内容が画面間で食い違う）。RootViewで作って渡す。
     init(
         deckStore: DeckStoreProtocol = DeckStore(),
-        cardRepository: CardRepositoryProtocol = CardRepository()
+        cardRepository: CardRepositoryProtocol = CardRepository(),
+        battleHistoryStore: BattleHistoryStore
     ) {
         self.deckStore = deckStore
         self.cardRepository = cardRepository
+        self.battleHistoryStore = battleHistoryStore
         self.decks = deckStore.fetchAll()
     }
 
@@ -103,9 +111,13 @@ final class DeckListViewModel {
         pendingDeleteDeck = deck
     }
 
+    /// デッキを削除する。そのデッキの対戦履歴も一緒に消す。
     func confirmDelete() {
         guard let deck = pendingDeleteDeck else { return }
-        perform { try deckStore.delete(deck) }
+        perform {
+            try deckStore.delete(deck)
+            try battleHistoryStore.deleteAll(for: deck.id)
+        }
         decks = deckStore.fetchAll()
         pendingDeleteDeck = nil
     }

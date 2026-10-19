@@ -2,8 +2,9 @@
 //  BattleRecordRow.swift
 //  OPToolkit
 //
-//  対戦履歴の1行。左に相手リーダーの画像、中央に名前・じゃんけん・先後・メモ、右に勝敗。
-//  勝敗は色だけに頼らず、「勝／負／分」の文字も出す。
+//  対戦履歴の1行。左に相手リーダーの画像、中央に回戦・リーダー名・じゃんけん・先後・メモ、右に勝敗。
+//  勝敗は色だけに頼らず、「勝／負／両」の文字も出す。
+//  じゃんけん・先後・勝敗は、未選択（記録しない）のものは表示しない。
 //
 
 import SwiftUI
@@ -19,13 +20,23 @@ struct BattleRecordRow: View {
                 .frame(width: 44)
 
             VStack(alignment: .leading, spacing: 4) {
+                Text("\(record.round)回戦")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+
                 Text(leaderTitle)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
 
-                HStack(spacing: 6) {
-                    tag("じゃんけん\(record.janken.shortLabel)")
-                    tag(record.turnOrder.label)
+                if record.janken != nil || record.turnOrder != nil {
+                    HStack(spacing: 6) {
+                        if let janken = record.janken {
+                            tag("じゃんけん\(janken.shortLabel)")
+                        }
+                        if let turnOrder = record.turnOrder {
+                            tag(turnOrder.label)
+                        }
+                    }
                 }
 
                 if !record.memo.isEmpty {
@@ -38,11 +49,13 @@ struct BattleRecordRow: View {
 
             Spacer(minLength: 8)
 
-            Text(record.result.shortLabel)
-                .font(.headline.weight(.bold))
-                .foregroundStyle(.white)
-                .frame(width: 36, height: 36)
-                .background(resultColor, in: Circle())
+            if let result = record.result {
+                Text(result.shortLabel)
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 36, height: 36)
+                    .background(resultColor(result), in: Circle())
+            }
         }
         // 行のどこをタップしても反応するようにする（Button + .plain だと文字の上だけになりやすい）
         .contentShape(Rectangle())
@@ -54,11 +67,11 @@ struct BattleRecordRow: View {
         return record.opponentLeaderNumber ?? "リーダー未設定"
     }
 
-    private var resultColor: Color {
-        switch record.result {
+    private func resultColor(_ result: MatchResult) -> Color {
+        switch result {
         case .win: return .blue
         case .lose: return .red
-        case .draw: return .gray
+        case .doubleLoss: return .gray
         }
     }
 
@@ -76,6 +89,8 @@ struct BattleRecordRow: View {
         BattleRecordRow(
             record: BattleRecord(
                 deckID: UUID(),
+                tournamentID: UUID(),
+                round: 1,
                 opponentLeaderNumber: Card.sampleLuffy.cardNumber,
                 janken: .win,
                 turnOrder: .first,
@@ -84,8 +99,23 @@ struct BattleRecordRow: View {
             ),
             leader: .sampleLuffy
         )
+        // じゃんけん・先後・勝敗を記録していない行（何も出ない）
         BattleRecordRow(
-            record: BattleRecord(deckID: UUID(), janken: .lose, turnOrder: .second, result: .lose),
+            record: BattleRecord(
+                deckID: UUID(),
+                tournamentID: UUID(),
+                round: 2
+            ),
+            leader: nil
+        )
+        BattleRecordRow(
+            record: BattleRecord(
+                deckID: UUID(),
+                tournamentID: UUID(),
+                round: 3,
+                turnOrder: .second,
+                result: .doubleLoss
+            ),
             leader: nil
         )
     }
