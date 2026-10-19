@@ -23,9 +23,13 @@ struct RootView: View {
         let favoritesStore = FavoritesStore()
         _cardListViewModel = State(initialValue: CardListViewModel(favoritesStore: favoritesStore))
 
+        // 対戦履歴の保存先（BattleHistoryStore）も、アプリで1つだけ作って渡す。
+        // デッキ画面（履歴画面への遷移・デッキ削除時の履歴削除）が使う。
+        let battleHistoryStore = BattleHistoryStore()
+
         // デッキ画面と一人回しが同じ保存先（DeckStore）を見るよう、1つだけ作って渡す。
         // 別々に作ると、デッキ画面で編集した内容が一人回しに反映されなくなる。
-        let deckListViewModel = DeckListViewModel()
+        let deckListViewModel = DeckListViewModel(battleHistoryStore: battleHistoryStore)
         _deckListViewModel = State(initialValue: deckListViewModel)
         _soloPlayViewModel = State(initialValue: SoloPlayViewModel(deckStore: deckListViewModel.store))
     }

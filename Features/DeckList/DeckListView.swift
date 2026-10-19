@@ -9,6 +9,9 @@
 //  - 右下にデッキ作成ボタン、その上にQR読み込みボタン（画像の配置に合わせたフローティングボタン）
 //  - デッキタップでデッキ詳細画面へ
 //
+//  bodyにmodifierを全部つなげると「型チェックが終わらない」コンパイルエラーになるため、
+//  遷移先・アラート・オーバーレイは別のプロパティ／ViewModifierに切り出している。
+//
 
 import SwiftUI
 
@@ -29,123 +32,103 @@ struct DeckListView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            ZStack(alignment: .bottomTrailing) {
-                Group {
-                    if !viewModel.hasLoaded {
-                        ProgressView()
-                    } else if viewModel.decks.isEmpty {
-                        ContentUnavailableView(
-                            "デッキがありません",
-                            systemImage: "square.stack.3d.up.slash",
-                            description: Text("右下の「＋」からデッキを作成できます")
-                        )
-                    } else {
-                        List {
-                            ForEach(Array(viewModel.decks.enumerated()), id: \.element.id) { index, deck in
-                                deckRow(deck: deck, index: index)
-                            }
-                        }
-                        .listStyle(.plain)
-                    }
+            mainContent
+                .navigationTitle("デッキ")
+                .task {
+                    await viewModel.load()
                 }
+                .navigationDestination(for: DeckListRoute.self) { route in
+                    destinationView(for: route)
+                }
+                .modifier(DeckListAlerts(viewModel: viewModel))
+                // QRスキャナー
+                .fullScreenCover(isPresented: $viewModel.isShowingScanner) {
+                    QRScannerView(
+                        onScan: { viewModel.handleScannedQRString($0) },
+                        onCancel: { viewModel.isShowingScanner = false }
+                    )
+                }
+                // 画像表示モーダル（保存ボタン付き）
+                .overlay { imagePreviewOverlay }
+                // 画像生成中のインジケーター（カード画像の取得待ち）
+                .overlay { generatingOverlay }
+        }
+    }
 
-                floatingButtons
-            }
-            .navigationTitle("デッキ")
-            .task {
-                await viewModel.load()
-            }
-            // デッキの保存（ディスクへの書き込み）に失敗したときの通知
-            .alert(
-                "保存できません",
-                isPresented: Binding(
-                    get: { viewModel.storageErrorMessage != nil },
-                    set: { if !$0 { viewModel.storageErrorMessage = nil } }
-                )
-            ) {
-                Button("OK") { viewModel.storageErrorMessage = nil }
-            } message: {
-                Text(viewModel.storageErrorMessage ?? "")
-            }
-            .navigationDestination(for: DeckListRoute.self) { route in
-                switch route {
-                case .existing(let deck):
-                    DeckDetailView(
-                        viewModel: DeckDetailViewModel(
-                            deck: deck,
-                            isNew: false,
-                            deckStore: viewModel.store,
-                            onSave: { viewModel.reloadFromStore() }
-                        )
-                    )
-                case .new:
-                    DeckDetailView(
-                        viewModel: DeckDetailViewModel(
-                            deck: Deck(name: "新しいデッキ"),
-                            isNew: true,
-                            deckStore: viewModel.store,
-                            onSave: { viewModel.reloadFromStore() }
-                        )
-                    )
-                case .battleHistory(let deck):
-                    BattleHistoryView(deck: deck)
+    // MARK: - 本体（一覧＋フローティングボタン）
+
+    private var mainContent: some View {
+        ZStack(alignment: .bottomTrailing) {
+            deckListContent
+            floatingButtons
+        }
+    }
+
+    @ViewBuilder
+    private var deckListContent: some View {
+        if !viewModel.hasLoaded {
+            ProgressView()
+        } else if viewModel.decks.isEmpty {
+            ContentUnavailableView(
+                "デッキがありません",
+                systemImage: "square.stack.3d.up.slash",
+                description: Text("右下の「＋」からデッキを作成できます")
+            )
+        } else {
+            List {
+                ForEach(Array(viewModel.decks.enumerated()), id: \.element.id) { index, deck in
+                    deckRow(deck: deck, index: index)
                 }
             }
-            // 削除確認モーダル（.confirmationDialogは環境によって行の近く＝画面上部寄りに出てしまうことがあるため、
-            // 画面中央に出る.alertに変更。キャンセル(.cancel)を先に書くと自動的に左、削除(.destructive)が右に並ぶ。
-            .alert(
-                "「\(viewModel.pendingDeleteDeck?.name ?? "")」を削除しますか？",
-                isPresented: Binding(
-                    get: { viewModel.pendingDeleteDeck != nil },
-                    set: { if !$0 { viewModel.cancelDelete() } }
-                )
-            ) {
-                Button("キャンセル", role: .cancel) {
-                    viewModel.cancelDelete()
-                }
-                Button("削除する", role: .destructive) {
-                    viewModel.confirmDelete()
-                }
-            } message: {
-                Text("この操作は取り消せません")
+            .listStyle(.plain)
+        }
+    }
+
+    // MARK: - 画面遷移先
+
+    @ViewBuilder
+    private func destinationView(for route: DeckListRoute) -> some View {
+        switch route {
+        case .existing(let deck):
+            DeckDetailView(viewModel: makeDetailViewModel(deck: deck, isNew: false))
+        case .new:
+            DeckDetailView(viewModel: makeDetailViewModel(deck: Deck(name: "新しいデッキ"), isNew: true))
+        case .battleHistory(let deck):
+            BattleHistoryView(
+                viewModel: BattleHistoryViewModel(deck: deck, store: viewModel.historyStore)
+            )
+        }
+    }
+
+    private func makeDetailViewModel(deck: Deck, isNew: Bool) -> DeckDetailViewModel {
+        DeckDetailViewModel(
+            deck: deck,
+            isNew: isNew,
+            deckStore: viewModel.store,
+            onSave: { viewModel.reloadFromStore() }
+        )
+    }
+
+    // MARK: - オーバーレイ
+
+    @ViewBuilder
+    private var imagePreviewOverlay: some View {
+        if let image = viewModel.shareImage {
+            DeckImagePreviewModal(image: image) {
+                viewModel.shareImage = nil
             }
-            // QRスキャナー
-            .fullScreenCover(isPresented: $viewModel.isShowingScanner) {
-                QRScannerView(
-                    onScan: { viewModel.handleScannedQRString($0) },
-                    onCancel: { viewModel.isShowingScanner = false }
-                )
-            }
-            .alert(
-                "読み込みエラー",
-                isPresented: Binding(
-                    get: { viewModel.scanErrorMessage != nil },
-                    set: { if !$0 { viewModel.scanErrorMessage = nil } }
-                )
-            ) {
-                Button("OK") { viewModel.scanErrorMessage = nil }
-            } message: {
-                Text(viewModel.scanErrorMessage ?? "")
-            }
-            // 画像表示モーダル（保存ボタン付き）
-            .overlay {
-                if let image = viewModel.shareImage {
-                    DeckImagePreviewModal(image: image) {
-                        viewModel.shareImage = nil
-                    }
-                    .transition(.opacity)
-                }
-            }
-            // 画像生成中のインジケーター（カード画像の取得待ち）
-            .overlay {
-                if viewModel.isGeneratingImage {
-                    ZStack {
-                        Color.black.opacity(0.3).ignoresSafeArea()
-                        ProgressView("画像を作成中…")
-                            .padding(20)
-                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-                    }
-                }
+            .transition(.opacity)
+        }
+    }
+
+    @ViewBuilder
+    private var generatingOverlay: some View {
+        if viewModel.isGeneratingImage {
+            ZStack {
+                Color.black.opacity(0.3).ignoresSafeArea()
+                ProgressView("画像を作成中…")
+                    .padding(20)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
             }
         }
     }
@@ -244,6 +227,78 @@ struct DeckListView: View {
     }
 }
 
+// MARK: - アラート（保存エラー・削除確認・QR読み込みエラー）
+
+/// デッキ画面の3つのアラートをまとめたmodifier。
+/// bodyに直接つなげるとコンパイラの型チェックが終わらなくなるため、切り出している。
+private struct DeckListAlerts: ViewModifier {
+    let viewModel: DeckListViewModel
+
+    func body(content: Content) -> some View {
+        content
+            // デッキの保存（ディスクへの書き込み）に失敗したときの通知
+            .alert(
+                "保存できません",
+                isPresented: storageErrorBinding
+            ) {
+                Button("OK") { viewModel.storageErrorMessage = nil }
+            } message: {
+                Text(viewModel.storageErrorMessage ?? "")
+            }
+            // 削除確認モーダル（.confirmationDialogは環境によって行の近く＝画面上部寄りに出てしまうことがあるため、
+            // 画面中央に出る.alertを使う。キャンセル(.cancel)を先に書くと自動的に左、削除(.destructive)が右に並ぶ。
+            .alert(
+                "「\(viewModel.pendingDeleteDeck?.name ?? "")」を削除しますか？",
+                isPresented: deleteBinding
+            ) {
+                Button("キャンセル", role: .cancel) {
+                    viewModel.cancelDelete()
+                }
+                Button("削除する", role: .destructive) {
+                    viewModel.confirmDelete()
+                }
+            } message: {
+                Text("この操作は取り消せません")
+            }
+            // QR読み込みエラー
+            .alert(
+                "読み込みエラー",
+                isPresented: scanErrorBinding
+            ) {
+                Button("OK") { viewModel.scanErrorMessage = nil }
+            } message: {
+                Text(viewModel.scanErrorMessage ?? "")
+            }
+    }
+
+    private var storageErrorBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.storageErrorMessage != nil },
+            set: { if !$0 { viewModel.storageErrorMessage = nil } }
+        )
+    }
+
+    private var deleteBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.pendingDeleteDeck != nil },
+            set: { if !$0 { viewModel.cancelDelete() } }
+        )
+    }
+
+    private var scanErrorBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.scanErrorMessage != nil },
+            set: { if !$0 { viewModel.scanErrorMessage = nil } }
+        )
+    }
+}
+
 #Preview {
-    DeckListView(viewModel: DeckListViewModel())
+    DeckListView(
+        viewModel: DeckListViewModel(
+            battleHistoryStore: BattleHistoryStore(
+                fileURL: FileManager.default.temporaryDirectory.appendingPathComponent("preview-battle-history.json")
+            )
+        )
+    )
 }
